@@ -97,7 +97,7 @@ class LaptopModel:
         # 记录价格变动
         if 'price' in data:
             db.execute_update(
-                "INSERT INTO price_history (laptop_id, price, change_date) VALUES (?, ?, NOW())",
+                "INSERT INTO price_history (laptop_id, price, change_date) VALUES (?, ?, datetime('now', 'localtime'))",
                 (laptop_id, data['price'])
             )
             

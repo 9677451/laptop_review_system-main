@@ -672,7 +672,7 @@ def ai_summary():
     # 4. 存入缓存
     try:
         db.execute_update(
-            "INSERT INTO ai_summaries (laptop_id, summary) VALUES (?, ?) ON DUPLICATE KEY UPDATE summary=VALUES(summary), created_at=NOW()",
+            "INSERT INTO ai_summaries (laptop_id, summary, created_at) VALUES (?, ?, datetime('now', 'localtime')) ON CONFLICT(laptop_id) DO UPDATE SET summary=excluded.summary, created_at=datetime('now', 'localtime')",
             (laptop_id, summary)
         )
     except Exception as e:
