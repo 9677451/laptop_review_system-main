@@ -128,6 +128,12 @@ const api = {
     deleteUser(userId) {
         return this.request(`/user/${userId}`, 'DELETE');
     },
+    getUsers() {
+        return this.request('/users');
+    },
+    adminUpdateUser(userId, data) {
+        return this.request(`/user/${userId}`, 'PUT', data);
+    },
 
     // Brands
     getBrands(keyword) {
@@ -136,6 +142,9 @@ const api = {
     },
     getBrandRankings() {
         return this.request('/brands/rankings');
+    },
+    getBrandDetail(id) {
+        return this.request(`/brands/${id}/detail`);
     },
     createBrand(data) {
         return this.request('/brands', 'POST', data);
@@ -165,6 +174,10 @@ const api = {
 
     getPriceHistory(id) {
         return this.request(`/laptops/${id}/price-history`);
+    },
+
+    getScoreDistribution(id) {
+        return this.request(`/laptops/${id}/score-distribution`);
     },
 
     createLaptop(data) {
@@ -232,5 +245,16 @@ const api = {
     },
     getBackups() {
         return this.request('/system/backups');
+    },
+
+    // AI
+    aiChat(message) {
+        return this.request('/ai/chat', 'POST', { message });
+    },
+    aiSummary(laptopId) {
+        return this.request('/ai/summary', 'POST', { laptop_id: laptopId });
+    },
+    aiRecommend(preferences) {
+        return this.request('/ai/recommend', 'POST', preferences);
     }
 };

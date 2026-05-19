@@ -4,7 +4,7 @@ if (typeof Vue === 'undefined') {
     console.log('Vue 3 加载成功');
 }
 
-const { createApp, ref, onMounted, watch, computed } = Vue;
+const { createApp, ref, onMounted, watch, computed, nextTick } = Vue;
 
 createApp({
     setup() {
@@ -28,9 +28,14 @@ createApp({
         const backingUp = ref(false);
         const showUserMenu = ref(false);
         const isDarkMode = ref(localStorage.getItem('theme') === 'dark');
+        const showBackToTop = ref(false);
+        const navScrolled = ref(false);
+        const pageProgress = ref(0);
 
         // Data
         const laptops = ref([]);
+        const totalLaptops = ref(0);
+        const totalPages = computed(() => Math.ceil(totalLaptops.value / filters.value.page_size));
         const brands = ref([]);
         const brandRankings = ref([]);
         const selectedLaptop = ref(null);
@@ -61,6 +66,10 @@ createApp({
         const wishlist = ref(JSON.parse(localStorage.getItem('wishlist') || '[]'));
         const priceAlerts = ref(JSON.parse(localStorage.getItem('priceAlerts') || '[]'));
         const allReviews = ref([]);
+        const selectedBrand = ref(null);
+        const brandLaptops = ref([]);
+        const brandStats = ref(null);
+        const users = ref([]);
 
         // 对比功能相关
         const compareList = ref([]);
@@ -100,18 +109,37 @@ createApp({
         const showLaptopModal = ref(false);
         const showBrandModal = ref(false);
         const showReviewModal = ref(false);
+        const showUserEditModal = ref(false);
 
         // Form Data
         const editProfileForm = ref({ username: '', email: '', phone: '', occupation: '' });
         const changePwdForm = ref({ old_password: '', new_password: '', confirm_password: '' });
-        const laptopForm = ref({ model: '', brand_id: '', specifications: '', price: 0, release_date: '', cpu_type: '', ram_size: '', gpu_type: '', screen_size: '' });
+        const laptopForm = ref({ model: '', brand_id: '', specifications: '', price: 0, release_date: '', cpu_type: '', ram_size: '', gpu_type: '', screen_size: '', image_url: '' });
         const brandForm = ref({ brand_name: '', official_website: '', headquarters: '', description: '', founded_date: '' });
+        const userEditForm = ref({ user_id: '', username: '', email: '', phone: '', occupation: '', role: '' });
         const editingId = ref(null);
 
         // Toast
         const toast = ref({ show: false, message: '', type: 'success' });
 
         const showToast = (message, type = 'success') => {
+            // 移除旧 toast
+            const old = document.querySelector('.toast-enhanced');
+            if (old) {
+                old.classList.add('leaving');
+                setTimeout(() => old.remove(), 300);
+            }
+            // 创建新 toast
+            const el = document.createElement('div');
+            el.className = `toast-enhanced toast-${type}`;
+            const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle' };
+            el.innerHTML = `<i class="fas ${icons[type] || 'fa-info-circle'} mr-2"></i>${message}`;
+            document.body.appendChild(el);
+            setTimeout(() => {
+                el.classList.add('leaving');
+                setTimeout(() => el.remove(), 300);
+            }, 3000);
+            // 同时保持旧的响应式 toast 兼容
             toast.value = { show: true, message, type };
             setTimeout(() => toast.value.show = false, 3000);
         };
@@ -123,10 +151,38 @@ createApp({
             return isNaN(num) ? null : num;
         };
 
+        const initAllCharts = () => {
+            try {
+                if (selectedLaptop.value?.stats && document.getElementById('scoreRadarChart')) {
+                    initRadarChart(selectedLaptop.value.stats);
+                }
+            } catch (e) { console.error('雷达图初始化失败:', e); }
+            try {
+                if (priceHistory.value.length > 0 && document.getElementById('priceHistoryChart')) {
+                    initPriceChart(priceHistory.value);
+                }
+            } catch (e) { console.error('价格图初始化失败:', e); }
+            try {
+                if (selectedLaptop.value && document.getElementById('scoreBarChart')) {
+                    initScoreBarChart(selectedLaptop.value.laptop_id);
+                }
+            } catch (e) { console.error('柱状图初始化失败:', e); }
+        };
+
         const formatScore = (score) => {
             if (score === null || score === undefined || score === '') return '暂无评分';
             const num = Number(score);
             return !isNaN(num) ? num.toFixed(1) : '暂无评分';
+        };
+
+        const renderStars = (score) => {
+            const num = Math.round(Number(score) || 0);
+            let html = '<span class="rainbow-stars">';
+            for (let i = 0; i < 5; i++) {
+                html += `<i class="star ${i < num ? 'fas fa-star' : 'far fa-star'}" style="font-size:inherit;"></i>`;
+            }
+            html += '</span>';
+            return html;
         };
 
         // ========== 数据获取函数 ==========
@@ -155,14 +211,18 @@ createApp({
         const searchLaptops = async () => {
             if (loading.value) return;
             loading.value = true;
+            startProgress();
             try {
                 const res = await api.getLaptops(filters.value);
                 console.log('API返回原始数据:', res);
-                
+
                 let data = res.data;
                 if (data && data.data) data = data.data;
                 if (!Array.isArray(data)) data = [];
-                
+
+                // 获取总数
+                totalLaptops.value = res.total || data.length;
+
                 // 关键修复：数据类型转换
                 laptops.value = data.map(item => ({
                     ...item,
@@ -170,14 +230,16 @@ createApp({
                     avg_score: fixNumber(item.avg_score),
                     review_count: fixNumber(item.review_count) || 0
                 }));
-                
+
                 console.log('获取笔记本列表成功:', laptops.value.length, '条数据');
             } catch (err) {
                 console.error('搜索笔记本失败:', err);
                 showToast(err.message, 'error');
                 laptops.value = [];
+                totalLaptops.value = 0;
             } finally {
                 loading.value = false;
+                finishProgress();
             }
         };
 
@@ -236,9 +298,17 @@ createApp({
 
         const showLaptopDetail = async (id) => {
             console.log('正在跳转详情页, ID:', id);
+
+            // 销毁旧图表
+            if (radarChart) { radarChart.destroy(); radarChart = null; }
+            if (scoreBarChart) { scoreBarChart.destroy(); scoreBarChart = null; }
+            if (priceChart) { priceChart.destroy(); priceChart = null; }
+            aiSummary.value = null;
+
             currentView.value = 'detail';
             selectedLaptop.value = null;
             loading.value = true;
+            startProgress();
             try {
                 const res = await api.getLaptop(id);
                 console.log('获取详情响应:', res);
@@ -265,9 +335,9 @@ createApp({
                 let reviewData = reviewRes.data;
                 if (reviewData && reviewData.data) reviewData = reviewData.data;
                 reviews.value = Array.isArray(reviewData) ? reviewData : [];
-                
-                // 生成 AI 摘要
-                aiSummary.value = generateAISummary(reviews.value);
+
+                // 调用 AI 摘要
+                fetchAISummary(id);
                 fetchQuestions(id);
 
                 // 获取推荐和价格历史
@@ -289,15 +359,6 @@ createApp({
                     }
                 }
                 
-                // 异步初始化图表
-                    setTimeout(() => {
-                        if (selectedLaptop.value?.stats) {
-                            initRadarChart(selectedLaptop.value.stats);
-                        }
-                        if (priceHistory.value.length > 0) {
-                            initPriceChart(priceHistory.value);
-                        }
-                    }, 100);
                 } catch (e) {
                     console.error('获取推荐或价格历史失败:', e);
                 }
@@ -309,6 +370,7 @@ createApp({
                 currentView.value = 'home';
             } finally {
                 loading.value = false;
+                finishProgress();
             }
         };
 
@@ -504,12 +566,17 @@ createApp({
         // ========== 笔记本管理函数 ==========
         const openAddLaptopModal = () => {
             editingId.value = null;
-            laptopForm.value = { 
-                model: '', 
-                brand_id: brands.value[0]?.brand_id || '', 
-                specifications: '', 
-                price: 0, 
-                release_date: '' 
+            laptopForm.value = {
+                model: '',
+                brand_id: brands.value[0]?.brand_id || '',
+                specifications: '',
+                price: 0,
+                release_date: '',
+                cpu_type: '',
+                ram_size: '',
+                gpu_type: '',
+                screen_size: '',
+                image_url: ''
             };
             showLaptopModal.value = true;
         };
@@ -525,7 +592,8 @@ createApp({
                 cpu_type: laptop.cpu_type || '',
                 ram_size: laptop.ram_size || '',
                 gpu_type: laptop.gpu_type || '',
-                screen_size: laptop.screen_size || ''
+                screen_size: laptop.screen_size || '',
+                image_url: laptop.image_url || ''
             };
             showLaptopModal.value = true;
         };
@@ -773,37 +841,124 @@ createApp({
             }
         };
 
+        // ========== 用户管理函数（管理员） ==========
+        const fetchUsers = async () => {
+            loading.value = true;
+            try {
+                const res = await api.getUsers();
+                let data = res.data;
+                if (data && data.data) data = data.data;
+                users.value = Array.isArray(data) ? data : [];
+                console.log('获取用户列表成功:', users.value.length, '个用户');
+            } catch (err) {
+                console.error('获取用户列表失败:', err);
+                users.value = [];
+            } finally {
+                loading.value = false;
+            }
+        };
+
+        const openUserEditModal = (u) => {
+            userEditForm.value = {
+                user_id: u.user_id,
+                username: u.username || '',
+                email: u.email || '',
+                phone: u.phone || '',
+                occupation: u.occupation || '',
+                role: u.role || 'user'
+            };
+            showUserEditModal.value = true;
+        };
+
+        const saveUserEdit = async () => {
+            try {
+                await api.adminUpdateUser(userEditForm.value.user_id, {
+                    username: userEditForm.value.username,
+                    email: userEditForm.value.email,
+                    phone: userEditForm.value.phone,
+                    occupation: userEditForm.value.occupation,
+                    role: userEditForm.value.role
+                });
+                showToast('用户信息已更新');
+                showUserEditModal.value = false;
+                fetchUsers();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        };
+
+        const adminDeleteUser = async (userId) => {
+            if (!confirm(`确定要删除用户 [${userId}] 吗？该操作不可逆！`)) return;
+            try {
+                await api.deleteUser(userId);
+                showToast('用户已删除');
+                fetchUsers();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        };
+
         const showBuyingGuide = ref(false);
         const guideStep = ref(1);
         const guideAnswers = ref({ budget: 5000, usage: 'office', portability: 'medium' });
         const guideResult = ref(null);
+        const guideResults = ref([]);
+        const guideAIReason = ref('');
+        const guideAITips = ref('');
+
         const findGuideLaptop = async () => {
             loading.value = true;
+            guideAIReason.value = '';
+            guideAITips.value = '';
             try {
-                // 根据回答筛选逻辑
-                const params = {
-                    max_price: guideAnswers.value.budget,
-                    sort_by: 'score_desc',
-                    page_size: 1
-                };
-                if (guideAnswers.value.usage === 'gaming') params.keyword = 'RTX';
-                if (guideAnswers.value.usage === 'design') params.keyword = 'i7';
-                
-                const res = await api.getLaptops(params);
-                let data = res.data;
-                if (data && data.data) data = data.data;
-                guideResult.value = Array.isArray(data) && data.length > 0 ? data[0] : null;
-                guideStep.value = 4; // 结果页
+                const res = await api.aiRecommend({
+                    budget: guideAnswers.value.budget,
+                    usage: guideAnswers.value.usage,
+                    portability: guideAnswers.value.portability
+                });
+                if (res.code === 200 && res.data) {
+                    const aiData = res.data;
+                    guideAITips.value = aiData.tips || '';
+                    const recs = aiData.recommendations || [];
+                    if (recs.length > 0) {
+                        const ids = recs.map(r => r.laptop_id);
+                        const allRes = await api.getLaptops({ page_size: 50, sort_by: 'score_desc' });
+                        let allData = allRes.data;
+                        if (allData && allData.data) allData = allData.data;
+                        const allLaptops = Array.isArray(allData) ? allData : [];
+                        guideResults.value = recs.map(r => {
+                            const match = allLaptops.find(l => l.laptop_id === r.laptop_id);
+                            return { ...(match || {}), ai_reason: r.reason, ai_score: r.score };
+                        }).filter(r => r.laptop_id);
+                        guideResult.value = guideResults.value[0] || null;
+                    } else {
+                        const fb = await api.getLaptops({ max_price: guideAnswers.value.budget, sort_by: 'score_desc', page_size: 4 });
+                        let fbData = fb.data;
+                        if (fbData && fbData.data) fbData = fbData.data;
+                        guideResults.value = Array.isArray(fbData) ? fbData : [];
+                        guideResult.value = guideResults.value[0] || null;
+                    }
+                }
+                guideStep.value = 4;
             } catch (e) {
-                console.error('向导查找失败:', e);
-                showToast('没找到合适的推荐，请调整预算', 'error');
+                console.error('AI推荐失败:', e);
+                try {
+                    const fb = await api.getLaptops({ max_price: guideAnswers.value.budget, sort_by: 'score_desc', page_size: 4 });
+                    let fbData = fb.data;
+                    if (fbData && fbData.data) fbData = fbData.data;
+                    guideResults.value = Array.isArray(fbData) ? fbData : [];
+                    guideResult.value = guideResults.value[0] || null;
+                    guideStep.value = 4;
+                } catch (e2) {
+                    showToast('没找到合适的推荐，请调整预算', 'error');
+                }
             } finally {
                 loading.value = false;
             }
         };
 
         // ========== 收藏夹功能 ==========
-        const toggleWishlist = (laptop) => {
+        const toggleWishlist = (laptop, event) => {
             const index = wishlist.value.findIndex(item => item.laptop_id === laptop.laptop_id);
             if (index > -1) {
                 wishlist.value.splice(index, 1);
@@ -817,6 +972,10 @@ createApp({
                     avg_score: laptop.avg_score
                 });
                 showToast('已加入收藏夹', 'success');
+                // 触发爱心爆发动画
+                if (event && event.currentTarget) {
+                    createHeartBurst(event.currentTarget);
+                }
             }
             localStorage.setItem('wishlist', JSON.stringify(wishlist.value));
         };
@@ -867,6 +1026,7 @@ createApp({
 
         // ========== 图表功能 ==========
         let radarChart = null;
+        let scoreBarChart = null;
         const initRadarChart = (stats) => {
             const ctx = document.getElementById('scoreRadarChart');
             if (!ctx) return;
@@ -919,6 +1079,60 @@ createApp({
             radarChart = new Chart(ctx, config);
         };
 
+        const initScoreBarChart = async (laptopId) => {
+            const ctx = document.getElementById('scoreBarChart');
+            if (!ctx) return;
+
+            try {
+                const res = await api.getScoreDistribution(laptopId);
+                let dist = res.data;
+                if (dist && dist.data) dist = dist.data;
+                if (!Array.isArray(dist)) dist = [];
+
+                const fullDist = [0, 0, 0, 0, 0]; // 1-5分
+                dist.forEach(d => {
+                    const score = parseInt(d.overall_score);
+                    if (score >= 1 && score <= 5) {
+                        fullDist[score - 1] = d.count;
+                    }
+                });
+
+                if (scoreBarChart) scoreBarChart.destroy();
+
+                scoreBarChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['1分', '2分', '3分', '4分', '5分'],
+                        datasets: [{
+                            data: fullDist,
+                            backgroundColor: [
+                                '#ef4444', '#f59e0b', '#eab308', '#22c55e', '#10b981'
+                            ],
+                            borderRadius: 6,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { stepSize: 1, color: isDarkMode.value ? '#94a3b8' : '#64748b' },
+                                grid: { color: isDarkMode.value ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }
+                            },
+                            x: {
+                                ticks: { color: isDarkMode.value ? '#94a3b8' : '#64748b' },
+                                grid: { display: false }
+                            }
+                        },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            } catch (e) {
+                console.error('获取评分分布失败:', e);
+            }
+        };
+
         let priceChart = null;
         const initPriceChart = (history) => {
             const ctx = document.getElementById('priceHistoryChart');
@@ -928,31 +1142,65 @@ createApp({
                 priceChart.destroy();
             }
 
+            // 计算趋势线（简单线性回归）
+            const prices = history.map(h => h.price);
+            const n = prices.length;
+            let trendData = [];
+            if (n >= 2) {
+                const indices = prices.map((_, i) => i);
+                const meanX = indices.reduce((a, b) => a + b, 0) / n;
+                const meanY = prices.reduce((a, b) => a + b, 0) / n;
+                const slope = indices.reduce((s, x, i) => s + (x - meanX) * (prices[i] - meanY), 0) /
+                              indices.reduce((s, x) => s + (x - meanX) ** 2, 0);
+                const intercept = meanY - slope * meanX;
+                // 预测未来2个点
+                const lastIdx = n - 1;
+                trendData = [
+                    { x: history[0].date, y: Math.round(intercept) },
+                    { x: history[lastIdx].date, y: Math.round(slope * lastIdx + intercept) },
+                ];
+            }
+
+            const datasets = [{
+                label: '价格走势',
+                data: history.map(h => h.price),
+                borderColor: '#ef4444',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                borderWidth: 3,
+                pointBackgroundColor: '#ef4444',
+                fill: true,
+                tension: 0.1
+            }];
+
+            // 添加趋势线
+            if (trendData.length === 2) {
+                const isDown = trendData[1].y < trendData[0].y;
+                datasets.push({
+                    label: '趋势预测',
+                    data: trendData.map(d => d.y),
+                    borderColor: isDown ? '#10b981' : '#f59e0b',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [6, 3],
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0
+                });
+            }
+
             priceChart = new Chart(ctx, {
                 type: 'line',
-                data: {
-                    labels: history.map(h => h.date),
-                    datasets: [{
-                        label: '价格走势',
-                        data: history.map(h => h.price),
-                        borderColor: '#ef4444',
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                        borderWidth: 3,
-                        pointBackgroundColor: '#ef4444',
-                        fill: true,
-                        tension: 0.1
-                    }]
-                },
+                data: { labels: history.map(h => h.date), datasets },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
-                        y: { 
+                        y: {
                             beginAtZero: false,
                             ticks: { color: isDarkMode.value ? '#94a3b8' : '#64748b' },
                             grid: { color: isDarkMode.value ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }
                         },
-                        x: { 
+                        x: {
                             ticks: { color: isDarkMode.value ? '#94a3b8' : '#64748b' },
                             grid: { display: false }
                         }
@@ -964,33 +1212,72 @@ createApp({
             });
         };
 
-        const generateAISummary = (reviewsList) => {
-            if (!reviewsList || reviewsList.length === 0) return null;
+        const fetchAISummary = async (laptopId) => {
+            aiSummary.value = null;
+            try {
+                const res = await api.aiSummary(laptopId);
+                if (res.code === 200 && res.data && res.data.summary) {
+                    const text = res.data.summary;
+                    // 解析AI返回的结构化文本
+                    const lines = text.split('\n').filter(l => l.trim());
+                    let summary = '', pros = [], cons = [], tips = '';
+                    let section = '';
 
-            const pros = [];
-            const cons = [];
-            
-            // 简单逻辑模拟 AI 分析
+                    for (const line of lines) {
+                        const clean = line.replace(/^[-*\s]+/, '').trim();
+                        if (clean.includes('【综合判断】') || clean.includes('摘要')) {
+                            section = 'summary';
+                            summary = clean.replace(/【综合判断】|摘要[：:]?/, '').trim();
+                        } else if (clean.includes('【优点】') || clean.includes('优势')) {
+                            section = 'pros';
+                        } else if (clean.includes('【缺点】') || clean.includes('劣势') || clean.includes('改进')) {
+                            section = 'cons';
+                        } else if (clean.includes('【适合人群】') || clean.includes('适合')) {
+                            section = 'tips';
+                            tips = clean.replace(/【适合人群】|适合人群[：:]?/, '').trim();
+                        } else if (clean.includes('【购买建议】')) {
+                            tips += ' | ' + clean.replace(/【购买建议】|购买建议[：:]?/, '').trim();
+                        } else if (section === 'pros' && clean) {
+                            pros.push(clean);
+                        } else if (section === 'cons' && clean) {
+                            cons.push(clean);
+                        }
+                    }
+
+                    if (!summary) summary = text.substring(0, 100);
+                    if (pros.length === 0) pros = ['AI暂未提取到优点'];
+                    if (cons.length === 0) cons = ['AI暂未提取到缺点'];
+
+                    aiSummary.value = {
+                        summary: summary + (tips ? ' ' + tips : ''),
+                        pros: pros.slice(0, 4),
+                        cons: cons.slice(0, 3)
+                    };
+                }
+            } catch (err) {
+                console.error('AI摘要获取失败:', err);
+                // 降级到本地生成
+                aiSummary.value = generateLocalSummary(reviews.value);
+            }
+        };
+
+        const generateLocalSummary = (reviewsList) => {
+            if (!reviewsList || reviewsList.length === 0) return null;
             const allContent = reviewsList.map(r => r.content).join(' ');
             const avgScore = reviewsList.reduce((acc, r) => acc + r.overall_score, 0) / reviewsList.length;
-
-            if (avgScore >= 4.5) pros.push('用户口碑极佳，综合表现出众');
+            const pros = [], cons = [];
+            if (avgScore >= 4.5) pros.push('用户口碑极佳');
             if (allContent.includes('快') || allContent.includes('性能')) pros.push('运行速度快，性能强劲');
             if (allContent.includes('轻') || allContent.includes('便携')) pros.push('轻薄便携，适合移动办公');
             if (allContent.includes('续航') || allContent.includes('电池')) pros.push('续航能力得到用户认可');
             if (allContent.includes('屏幕') || allContent.includes('画质')) pros.push('屏幕显示效果细腻');
-
             if (avgScore < 3.5) cons.push('综合评分偏低，建议谨慎考虑');
             if (allContent.includes('热') || allContent.includes('烫')) cons.push('散热表现有待提升');
             if (allContent.includes('响') || allContent.includes('噪音')) cons.push('风扇噪音相对明显');
-            if (allContent.includes('贵') || allContent.includes('性价比')) cons.push('价格略高，性价比一般');
-
-            // 兜底
             if (pros.length === 0) pros.push('性能稳定，满足日常需求');
             if (cons.length === 0) cons.push('暂无明显缺点反馈');
-
             return {
-                summary: `根据 ${reviewsList.length} 位用户的评价，这款笔记本的综合表现${avgScore >= 4 ? '非常优秀' : '较为均衡'}。`,
+                summary: `根据 ${reviewsList.length} 位用户的评价，综合表现${avgScore >= 4 ? '非常优秀' : '较为均衡'}。`,
                 pros: pros.slice(0, 3),
                 cons: cons.slice(0, 2)
             };
@@ -1005,10 +1292,8 @@ createApp({
             } else {
                 document.documentElement.classList.remove('dark');
             }
-            // 重新初始化雷达图以适配颜色
-            if (selectedLaptop.value?.stats) {
-                initRadarChart(selectedLaptop.value.stats);
-            }
+            // 重新初始化所有图表以适配颜色
+            initAllCharts();
         };
 
         const resetFilters = () => {
@@ -1018,10 +1303,42 @@ createApp({
                 sort_by: 'newest',
                 min_price: null,
                 max_price: null,
+                cpu_type: '',
+                ram_size: '',
+                gpu_type: '',
                 page: 1,
                 page_size: 12
             };
             searchLaptops();
+        };
+
+        const showBrandDetail = async (brandId) => {
+            currentView.value = 'brandDetail';
+            selectedBrand.value = null;
+            brandLaptops.value = [];
+            brandStats.value = null;
+            loading.value = true;
+            try {
+                const res = await api.getBrandDetail(brandId);
+                let data = res.data;
+                if (data && data.data) data = data.data;
+                if (data) {
+                    selectedBrand.value = data.brand;
+                    brandLaptops.value = (data.laptops || []).map(item => ({
+                        ...item,
+                        price: fixNumber(item.price) || 0,
+                        avg_score: fixNumber(item.avg_score),
+                        review_count: fixNumber(item.review_count) || 0
+                    }));
+                    brandStats.value = data.stats;
+                }
+                window.scrollTo(0, 0);
+            } catch (err) {
+                console.error('获取品牌详情失败:', err);
+                showToast(err.message, 'error');
+            } finally {
+                loading.value = false;
+            }
         };
 
         const goToHome = () => {
@@ -1043,14 +1360,65 @@ createApp({
             searchLaptops();
         };
 
+        const exportCSV = (filename, rows) => {
+            if (!rows.length) {
+                showToast('没有数据可导出', 'warning');
+                return;
+            }
+            const BOM = '﻿';
+            const headers = Object.keys(rows[0]);
+            const csvContent = BOM + [
+                headers.join(','),
+                ...rows.map(row =>
+                    headers.map(h => {
+                        let val = row[h];
+                        if (val === null || val === undefined) return '';
+                        val = String(val).replace(/"/g, '""');
+                        return /[,"\n\r]/.test(val) ? `"${val}"` : val;
+                    }).join(',')
+                )
+            ].join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.click();
+            URL.revokeObjectURL(url);
+            showToast('导出成功');
+        };
+
         const downloadLaptopReport = () => {
-            showToast('报表导出功能开发中');
-            window.print();
+            const rows = laptopReport.value.map(l => ({
+                '型号': l.model || '',
+                '品牌': l.brand_name || '',
+                '价格': l.price || 0,
+                'CPU': l.cpu_type || '',
+                '内存(G)': l.ram_size || '',
+                '显卡': l.gpu_type || '',
+                '屏幕(英寸)': l.screen_size || '',
+                '平均评分': l.avg_score ? Number(l.avg_score).toFixed(1) : '',
+                '评价数': l.review_count || 0,
+                '发布日期': l.release_date || ''
+            }));
+            const date = new Date().toISOString().slice(0, 10);
+            exportCSV(`笔记本报表_${date}.csv`, rows);
         };
 
         const downloadReviewReport = () => {
-            showToast('报表导出功能开发中');
-            window.print();
+            const rows = reviewReport.value.map(r => ({
+                '用户名': r.username || '',
+                '笔记本型号': r.model || '',
+                '综合评分': r.overall_score || '',
+                '性能评分': r.performance_score || '',
+                '续航评分': r.battery_score || '',
+                '体验评分': r.experience_score || '',
+                '评价内容': r.content || '',
+                '评价时间': r.review_time || ''
+            }));
+            const date = new Date().toISOString().slice(0, 10);
+            exportCSV(`评价报表_${date}.csv`, rows);
         };
 
         // 刷新当前管理标签页
@@ -1072,6 +1440,9 @@ createApp({
                     break;
                 case 'system':
                     fetchBackups();
+                    break;
+                case 'users':
+                    fetchUsers();
                     break;
             }
             showToast('刷新成功');
@@ -1109,6 +1480,18 @@ createApp({
             if (newTab === 'reviews') {
                 fetchReports();
             }
+            if (newTab === 'users') {
+                fetchUsers();
+            }
+        });
+
+        // 监听笔记本数据变化，自动绘制图表
+        watch(selectedLaptop, (laptop) => {
+            if (laptop && currentView.value === 'detail') {
+                nextTick(() => {
+                    setTimeout(() => initAllCharts(), 200);
+                });
+            }
         });
 
         watch(currentView, (newView) => {
@@ -1134,44 +1517,164 @@ createApp({
             }
         });
 
+        // ========== 滚动处理 ==========
+        const handleScroll = () => {
+            const scrollY = window.scrollY;
+            showBackToTop.value = scrollY > 500;
+            navScrolled.value = scrollY > 50;
+        };
+
+        const scrollToTop = () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        // ========== 爱心粒子爆发 ==========
+        const createHeartBurst = (el) => {
+            el.classList.add('heart-burst');
+            setTimeout(() => el.classList.remove('heart-burst'), 600);
+
+            const colors = ['#ef4444', '#f97316', '#fbbf24', '#ec4899', '#8b5cf6'];
+            const rect = el.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+
+            for (let i = 0; i < 10; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'heart-particle';
+                particle.style.cssText = `
+                    left: ${cx}px;
+                    top: ${cy}px;
+                    background: ${colors[i % colors.length]};
+                    --tx: ${(Math.random() - 0.5) * 60}px;
+                    --ty: ${(Math.random() - 0.5) * 60}px;
+                    position: fixed;
+                    z-index: 9999;
+                `;
+                document.body.appendChild(particle);
+                setTimeout(() => particle.remove(), 700);
+            }
+        };
+
+        // ========== 波纹点击效果 ==========
+        const createRipple = (e, el) => {
+            const ripple = document.createElement('span');
+            ripple.className = 'ripple-effect';
+            const rect = el.getBoundingClientRect();
+            ripple.style.left = e.clientX - rect.left + 'px';
+            ripple.style.top = e.clientY - rect.top + 'px';
+            el.style.position = 'relative';
+            el.style.overflow = 'hidden';
+            el.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 600);
+        };
+
+        // ========== 滚动显示观察器 ==========
+        const observeReveal = () => {
+            const observer = new IntersectionObserver(
+                (entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('revealed');
+                        }
+                    });
+                },
+                { threshold: 0.1, rootMargin: '0px 0px -30px 0px' }
+            );
+
+            document.querySelectorAll('.reveal-on-scroll').forEach(el => {
+                observer.observe(el);
+            });
+        };
+
+        // ========== 数字递增动画 ==========
+        const animateCount = (el, target, duration = 800) => {
+            const start = 0;
+            const startTime = performance.now();
+            const isFloat = String(target).includes('.');
+            const decimals = isFloat ? String(target).split('.')[1].length : 0;
+
+            const update = (now) => {
+                const elapsed = now - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const current = start + (target - start) * eased;
+                el.textContent = isFloat ? current.toFixed(decimals) : Math.round(current);
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                } else {
+                    el.textContent = isFloat ? target.toFixed(decimals) : target;
+                }
+            };
+            requestAnimationFrame(update);
+        };
+
+        // ========== 进度条 ==========
+        let nprogressTimer = null;
+        const startProgress = () => {
+            pageProgress.value = 0;
+            const bar = document.getElementById('nprogressBar');
+            const steps = [20, 50, 75, 90];
+            steps.forEach((val, i) => {
+                nprogressTimer = setTimeout(() => {
+                    pageProgress.value = val;
+                    if (bar) bar.style.width = val + '%';
+                }, (i + 1) * 100);
+            });
+        };
+
+        const finishProgress = () => {
+            if (nprogressTimer) clearTimeout(nprogressTimer);
+            pageProgress.value = 100;
+            const bar = document.getElementById('nprogressBar');
+            if (bar) bar.style.width = '100%';
+            setTimeout(() => {
+                pageProgress.value = 0;
+                if (bar) bar.style.width = '0%';
+            }, 400);
+        };
+
         // ========== Lifecycle ==========
         onMounted(() => {
-            // 初始化主题
             if (isDarkMode.value) {
                 document.documentElement.classList.add('dark');
             }
 
-            // 验证 token 是否有效
             const token = localStorage.getItem('token');
             const storedUser = localStorage.getItem('user');
             if (token && storedUser) {
                 console.log('用户已登录:', JSON.parse(storedUser));
             }
-            
+
             fetchBrands();
             searchLaptops();
-            
+
+            // 滚动监听
+            window.addEventListener('scroll', handleScroll, { passive: true });
+
             // 点击外部关闭用户菜单
             window.addEventListener('click', (e) => {
-                if (!e.target.closest('.relative')) {
+                if (!e.target || !e.target.closest || !e.target.closest('.relative')) {
                     showUserMenu.value = false;
                 }
             });
+
+            // 初始观察滚动显示元素
+            setTimeout(observeReveal, 100);
         });
 
         // ========== Return ==========
         return {
             // State
-            currentView, adminTab, user, loading, backingUp, showUserMenu, isDarkMode,
-            laptops, brands, brandRankings, selectedLaptop, reviews, sortedReviews, reviewSortBy, recommendations, aiSummary, searchSuggestions, helpData, laptopReport, reviewReport, backups, allReviews, adminStats, priceHistory, wishlist, questions,
+            currentView, adminTab, user, loading, backingUp, showUserMenu, isDarkMode, showBackToTop, navScrolled, pageProgress,
+            laptops, totalLaptops, totalPages, brands, brandRankings, selectedLaptop, reviews, sortedReviews, reviewSortBy, recommendations, aiSummary, searchSuggestions, helpData, laptopReport, reviewReport, backups, allReviews, adminStats, priceHistory, wishlist, questions, users, selectedBrand, brandLaptops, brandStats,
             filters, loginForm, regForm, reviewForm, questionInput,
-            showReviewModal, toast, showBuyingGuide, guideStep, guideAnswers, guideResult,
-            showEditProfileModal, showChangePwdModal, showLaptopModal, showBrandModal,
-            editProfileForm, changePwdForm, laptopForm, brandForm, editingId,
+            showReviewModal, toast, showBuyingGuide, guideStep, guideAnswers, guideResult, guideResults, guideAIReason, guideAITips,
+            showEditProfileModal, showChangePwdModal, showLaptopModal, showBrandModal, showUserEditModal,
+            editProfileForm, changePwdForm, laptopForm, brandForm, userEditForm, editingId,
             compareList, showCompareModal,
             
             // Methods
-            searchLaptops, resetFilters, showLaptopDetail, goToHome, toggleDarkMode,
+            searchLaptops, resetFilters, showLaptopDetail, showBrandDetail, goToHome, toggleDarkMode,
             login, register, logout,
             openReviewModal, submitReview, deleteReview, voteReview, findGuideLaptop,
             submitQuestion, answerQuestion, deleteQuestion, promptAnswer,
@@ -1182,9 +1685,12 @@ createApp({
             openAddBrandModal, openEditBrandModal, saveBrand, deleteBrand,
             downloadLaptopReport, downloadReviewReport,
             refreshCurrentTab, toggleCompare, isInCompare, toggleWishlist, isInWishlist, checkDiff, togglePriceAlert, isSubscribed,
+            fetchUsers, openUserEditModal, saveUserEdit, adminDeleteUser,
             
             // Helpers
-            formatScore, fixNumber
+            formatScore, fixNumber, renderStars,
+            scrollToTop, createHeartBurst, createRipple, animateCount,
+            startProgress, finishProgress
         };
     }
 }).mount('#app');

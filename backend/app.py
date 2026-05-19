@@ -1,6 +1,8 @@
 import os
+import gc
 import subprocess
 import datetime
+import json
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from config import Config
@@ -11,9 +13,11 @@ from models.brand import BrandModel
 from models.laptop import LaptopModel
 from models.review import ReviewModel
 from models.question import QuestionModel
+from ai_service import AIService
 
 app = Flask(__name__, static_folder='../frontend')
-# 允许跨域请求
+app.config['JSON_AS_ASCII'] = False  # 中文 JSON 不转义，减少 CPU
+app.config['JSON_SORT_KEYS'] = False  # 不排序 JSON key，减少开销
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 @app.route('/')
@@ -92,6 +96,28 @@ def update_password():
     UserModel.update_password(request.current_user['user_id'], data['new_password'])
     return jsonify({'code': 200, 'message': '密码修改成功'})
 
+@app.route('/api/users', methods=['GET'])
+@token_required
+@admin_required
+def get_all_users():
+    users = UserModel.get_all_users()
+    return jsonify({'code': 200, 'data': users})
+
+@app.route('/api/user/<user_id>', methods=['PUT'])
+@token_required
+@admin_required
+def admin_update_user(user_id):
+    """管理员修改任意用户信息（不含密码）"""
+    data = request.get_json()
+    update_data = {}
+    for field in ['username', 'email', 'phone', 'occupation', 'role']:
+        if field in data and data[field] is not None:
+            update_data[field] = data[field]
+    if not update_data:
+        return jsonify({'code': 400, 'message': '没有需要更新的字段'}), 400
+    UserModel.update_user(user_id, update_data)
+    return jsonify({'code': 200, 'message': '用户信息更新成功'})
+
 @app.route('/api/user/<user_id>', methods=['DELETE'])
 @token_required
 @admin_required
@@ -144,6 +170,29 @@ def delete_brand(brand_id):
     BrandModel.delete_brand(brand_id)
     return jsonify({'code': 200, 'message': '删除成功'})
 
+@app.route('/api/brands/<int:brand_id>/detail', methods=['GET'])
+def get_brand_detail(brand_id):
+    brand = BrandModel.get_brand_by_id(brand_id)
+    if not brand:
+        return jsonify({'code': 404, 'message': '品牌不存在'}), 404
+
+    # 该品牌下的笔记本
+    laptops_data, _ = LaptopModel.get_all_laptops(brand_id=brand_id, page_size=100)
+    stats_query = """
+        SELECT AVG(overall_score) as avg_score, COUNT(*) as review_count
+        FROM reviews r JOIN laptops l ON r.laptop_id = l.laptop_id
+        WHERE l.brand_id = %s
+    """
+    stats = db.execute_query(stats_query, (brand_id,))
+    return jsonify({
+        'code': 200,
+        'data': {
+            'brand': brand,
+            'laptops': laptops_data,
+            'stats': stats[0] if stats else None
+        }
+    })
+
 @app.route('/api/brands/rankings', methods=['GET'])
 def get_brand_rankings():
     query = """
@@ -171,8 +220,8 @@ def get_laptops():
     ram_size = request.args.get('ram_size')
     gpu_type = request.args.get('gpu_type')
     sort_by = request.args.get('sort_by', 'newest')
-    laptops = LaptopModel.get_all_laptops(page, page_size, brand_id, keyword, sort_by, min_price, max_price, cpu_type, ram_size, gpu_type)
-    return jsonify({'code': 200, 'data': laptops})
+    laptops, total = LaptopModel.get_all_laptops(page, page_size, brand_id, keyword, sort_by, min_price, max_price, cpu_type, ram_size, gpu_type)
+    return jsonify({'code': 200, 'data': laptops, 'total': total})
 
 @app.route('/api/laptops/<int:laptop_id>', methods=['GET'])
 def get_laptop(laptop_id):
@@ -204,7 +253,8 @@ def create_laptop():
         cpu_type=data.get('cpu_type'),
         ram_size=data.get('ram_size'),
         gpu_type=data.get('gpu_type'),
-        screen_size=data.get('screen_size')
+        screen_size=data.get('screen_size'),
+        image_url=data.get('image_url', '').strip() or None
     )
     return jsonify({'code': 200, 'message': '添加成功', 'laptop_id': laptop_id})
 
@@ -288,6 +338,17 @@ def update_review(review_id):
 @app.route('/api/reviews/<int:review_id>', methods=['DELETE'])
 @token_required
 def delete_review(review_id):
+    user_id = request.current_user['user_id']
+    role = request.current_user_role
+    # 需要是管理员或评价作者
+    if role != 'admin':
+        result = db.execute_query(
+            "SELECT user_id FROM reviews WHERE review_id = %s", (review_id,)
+        )
+        if not result:
+            return jsonify({'code': 404, 'message': '评价不存在'}), 404
+        if result[0]['user_id'] != user_id:
+            return jsonify({'code': 403, 'message': '无权限删除此评价'}), 403
     ReviewModel.delete_review(review_id)
     return jsonify({'code': 200, 'message': '删除成功'})
 
@@ -307,6 +368,11 @@ def vote_review(review_id):
     UserModel.add_points(user_id, 2)
     
     return jsonify({'code': 200, 'message': '感谢您的反馈，获得 2 积分！'})
+
+@app.route('/api/laptops/<int:laptop_id>/score-distribution', methods=['GET'])
+def get_score_distribution(laptop_id):
+    distribution = ReviewModel.get_score_distribution(laptop_id)
+    return jsonify({'code': 200, 'data': distribution})
 
 # ==================== 问答管理 ====================
 
@@ -340,8 +406,19 @@ def answer_question(question_id):
 @app.route('/api/questions/<int:question_id>', methods=['DELETE'])
 @token_required
 def delete_question(question_id):
-    # 只有管理员或提问者可以删除
-    # 这里简单处理，暂时只让管理员删除
+    user_id = request.current_user['user_id']
+    role = request.current_user_role
+    # 需要是管理员或提问者本人
+    if role != 'admin':
+        questions = QuestionModel.get_questions_by_laptop(None)
+        # 从数据库直接查
+        result = db.execute_query(
+            "SELECT user_id FROM questions WHERE question_id = %s", (question_id,)
+        )
+        if not result:
+            return jsonify({'code': 404, 'message': '问答不存在'}), 404
+        if result[0]['user_id'] != user_id:
+            return jsonify({'code': 403, 'message': '无权限删除此问答'}), 403
     QuestionModel.delete_question(question_id)
     return jsonify({'code': 200, 'message': '删除成功'})
 
@@ -365,7 +442,7 @@ def get_help():
 @token_required
 @admin_required
 def report_laptops():
-    laptops = LaptopModel.get_all_laptops(page=1, page_size=1000)
+    laptops, _ = LaptopModel.get_all_laptops(page=1, page_size=1000)
     return jsonify({'code': 200, 'data': laptops, 'title': '笔记本信息报表'})
 
 @app.route('/api/report/reviews', methods=['GET'])
@@ -486,5 +563,191 @@ def list_backups():
     backups.sort(key=lambda x: x['time'], reverse=True)
     return jsonify({'code': 200, 'data': backups})
 
+# ==================== 内存优化 ====================
+
+@app.after_request
+def add_gc_header(response):
+    """每 50 个请求后触发一次垃圾回收，限制 Flask 内存增长"""
+    if hasattr(add_gc_header, 'counter'):
+        add_gc_header.counter += 1
+    else:
+        add_gc_header.counter = 1
+    if add_gc_header.counter % 50 == 0:
+        gc.collect()
+    if request.path.startswith('/api/'):
+        response.headers['Cache-Control'] = 'no-cache'
+    else:
+        # 静态资源缓存 1 小时，减少重复请求
+        response.headers['Cache-Control'] = 'public, max-age=3600'
+    return response
+
+# ==================== AI 功能 ====================
+
+@app.route('/api/ai/chat', methods=['POST'])
+def ai_chat():
+    """AI 对话推荐"""
+    data = request.get_json()
+    user_message = data.get('message', '')
+    if not user_message:
+        return jsonify({'code': 400, 'message': '请输入问题'}), 400
+
+    # 获取笔记本上下文
+    laptops, _ = LaptopModel.get_all_laptops(page_size=100)
+    context_lines = []
+    for l in laptops[:20]:
+        context_lines.append(
+            f'[{l["laptop_id"]}] {l["brand_name"]} {l["model"]} '
+            f'¥{l["price"]} CPU:{l.get("cpu_type","")} '
+            f'评分:{l.get("avg_score","N/A")} 评价数:{l.get("review_count",0)}'
+        )
+    context = '\n'.join(context_lines) if context_lines else '暂无笔记本数据'
+
+    result = AIService.chat(user_message, context)
+    if 'error' in result:
+        return jsonify({'code': 500, 'message': result['error']}), 500
+    return jsonify({'code': 200, 'data': {'reply': result['reply']}})
+
+
+@app.route('/api/ai/summary', methods=['POST'])
+def ai_summary():
+    """AI 评价摘要（带缓存，避免重复烧 token）"""
+    data = request.get_json()
+    laptop_id = data.get('laptop_id')
+    if not laptop_id:
+        return jsonify({'code': 400, 'message': '缺少笔记本ID'}), 400
+
+    laptop = LaptopModel.get_laptop_by_id(laptop_id)
+    if not laptop:
+        return jsonify({'code': 404, 'message': '笔记本不存在'}), 404
+
+    # 1. 先查缓存（表不存在时自动创建）
+    try:
+        cache = db.execute_query(
+            "SELECT summary FROM ai_summaries WHERE laptop_id=%s AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)",
+            (laptop_id,)
+        )
+        if cache:
+            return jsonify({'code': 200, 'data': {'summary': cache[0]['summary'], 'cached': True}})
+    except Exception:
+        db.execute_update(
+            "CREATE TABLE IF NOT EXISTS ai_summaries (laptop_id INT PRIMARY KEY, summary TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+        )
+
+    reviews = ReviewModel.get_reviews_by_laptop(laptop_id)
+    if not reviews:
+        return jsonify({'code': 200, 'data': {'summary': '暂无用户评价，无法生成AI摘要。'}})
+
+    # 2. 精简评价内容（最多10条，每条截断80字）
+    reviews_text = '\n---\n'.join([
+        f'评分:{r.get("overall_score","?")}/5 | {r.get("content","")[:80]}'
+        for r in reviews[:10]
+    ])
+
+    # 3. 调用 AI
+    result = AIService.summarize_reviews(
+        f'{laptop.get("brand_name","")} {laptop.get("model","")}',
+        reviews_text
+    )
+    if 'error' in result:
+        return jsonify({'code': 500, 'message': result['error']}), 500
+
+    summary = result['reply']
+
+    # 4. 存入缓存
+    try:
+        db.execute_update(
+            "INSERT INTO ai_summaries (laptop_id, summary) VALUES (%s, %s) ON DUPLICATE KEY UPDATE summary=VALUES(summary), created_at=NOW()",
+            (laptop_id, summary)
+        )
+    except Exception as e:
+        print(f'缓存写入失败: {e}')
+
+    return jsonify({'code': 200, 'data': {'summary': summary}})
+
+
+@app.route('/api/ai/recommend', methods=['POST'])
+def ai_recommend():
+    """AI 智能推荐"""
+    data = request.get_json()
+    preferences = {
+        'budget': data.get('budget', 5000),
+        'usage': data.get('usage', 'office'),
+        'portability': data.get('portability', 'medium')
+    }
+
+    # 根据预算范围筛选候选机型
+    budget = int(preferences['budget'])
+    min_price = max(0, budget - 3000)
+    max_price = budget + 2000
+
+    laptops, _ = LaptopModel.get_all_laptops(page_size=200)
+    candidates = []
+    for l in laptops:
+        price = l.get('price', 0)
+        if price is None:
+            continue
+        try:
+            price = float(price)
+        except (ValueError, TypeError):
+            continue
+        if min_price <= price <= max_price:
+            candidates.append({
+                'laptop_id': l['laptop_id'],
+                'model': l['model'],
+                'brand_name': l.get('brand_name', ''),
+                'price': price,
+                'cpu_type': l.get('cpu_type', ''),
+                'gpu_type': l.get('gpu_type', ''),
+                'ram_size': l.get('ram_size', ''),
+                'avg_score': float(l.get('avg_score', 0) or 0),
+                'review_count': l.get('review_count', 0)
+            })
+
+    if not candidates:
+        # 放宽条件，取评分最高的
+        sorted_laptops = sorted(laptops, key=lambda x: float(x.get('avg_score', 0) or 0), reverse=True)
+        candidates = sorted_laptops[:15]
+        candidates = [{
+            'laptop_id': l['laptop_id'], 'model': l['model'],
+            'brand_name': l.get('brand_name', ''), 'price': l.get('price', 0),
+            'cpu_type': l.get('cpu_type', ''), 'gpu_type': l.get('gpu_type', ''),
+            'ram_size': l.get('ram_size', ''), 'avg_score': float(l.get('avg_score', 0) or 0),
+            'review_count': l.get('review_count', 0)
+        } for l in candidates]
+
+    result = AIService.recommend(
+        preferences,
+        json.dumps(candidates[:20], ensure_ascii=False, default=str)
+    )
+    if 'error' in result:
+        return jsonify({'code': 500, 'message': result['error']}), 500
+
+    # 尝试解析 JSON 回复
+    reply = result['reply']
+    try:
+        parsed = json.loads(reply)
+    except json.JSONDecodeError:
+        # 如果不是纯JSON，尝试提取
+        import re
+        match = re.search(r'\{[\s\S]*\}', reply)
+        if match:
+            try:
+                parsed = json.loads(match.group())
+            except json.JSONDecodeError:
+                parsed = {'tips': reply, 'recommendations': []}
+        else:
+            parsed = {'tips': reply, 'recommendations': []}
+
+    return jsonify({'code': 200, 'data': parsed})
+
+
+@app.route('/api/health')
+def health_check():
+    """轻量健康检查，不查数据库"""
+    return jsonify({'code': 200, 'status': 'ok'})
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # 1GB 内存优化参数
+    # debug=False: 关闭调试模式和重载器，节省 ~50MB
+    # threaded=False: 单线程模式，减小内存开销
+    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)

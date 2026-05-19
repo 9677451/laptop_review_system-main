@@ -60,6 +60,11 @@ class UserModel:
         return db.execute_update(query, (hashed_pwd, user_id))
     
     @staticmethod
+    def get_all_users():
+        query = "SELECT user_id, username, email, phone, occupation, role, points, level, register_time FROM users ORDER BY register_time DESC"
+        return db.execute_query(query)
+
+    @staticmethod
     def delete_user(user_id):
         query = "DELETE FROM users WHERE user_id = %s"
         return db.execute_update(query, (user_id,))

@@ -20,14 +20,15 @@ class Database:
             
             self.pool = mysql.connector.pooling.MySQLConnectionPool(
                 pool_name="laptop_pool",
-                pool_size=5,
+                pool_size=3,  # 1GB 内存限制连接数
                 pool_reset_session=True,
                 host=Config.DB_HOST,
                 port=Config.DB_PORT,
                 user=Config.DB_USER,
                 password=Config.DB_PASSWORD,
                 database=Config.DB_NAME,
-                charset='utf8mb4'
+                charset='utf8mb4',
+                connection_timeout=30
             )
         except Error as e:
             print(f"数据库连接池初始化失败: {e}")

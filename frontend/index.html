@@ -42,12 +42,27 @@
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 dark:bg-dark-bg dark:text-gray-100 transition-colors duration-300">
+    <!-- 页面加载动画 -->
+    <div class="page-loader" id="pageLoader">
+        <div class="loader-content">
+            <div class="loader-logo">
+                <i class="fas fa-laptop"></i>
+            </div>
+            <div class="loader-title">笔记本评价系统</div>
+            <div class="loader-bar-track">
+                <div class="loader-bar-fill" id="loaderBar"></div>
+            </div>
+        </div>
+    </div>
+    <div class="nprogress-bar" id="nprogressBar" style="width:0%;"></div>
+    <div class="cursor-spotlight" id="cursorSpotlight"></div>
+    <canvas id="particleCanvas"></canvas>
     <div id="app" v-cloak>
         <!-- 导航栏 -->
-        <nav class="bg-white shadow-md sticky top-0 z-50 dark:bg-dark-card dark:border-b dark:border-dark-border">
+        <nav class="bg-white shadow-md sticky top-0 z-50 dark:bg-dark-card dark:border-b dark:border-dark-border" id="mainNav">
             <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                 <div class="flex items-center space-x-2 cursor-pointer" @click="goToHome">
-                    <i class="fas fa-laptop text-blue-600 text-2xl"></i>
+                    <i class="fas fa-laptop text-blue-600 text-2xl logo-animate"></i>
                     <span class="text-xl font-bold text-gray-800 dark:text-white tracking-tight">笔记本评价系统</span>
                 </div>
 
@@ -105,7 +120,63 @@
             
             <!-- 1. 首页 (笔记本列表 + 搜索) -->
             <div v-if="currentView === 'home'">
-                <div class="bg-white dark:bg-dark-card rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-6 mb-8">
+                <!-- Hero 区域 -->
+                <div class="hero-section relative overflow-hidden bg-white dark:bg-dark-card rounded-3xl shadow-sm border border-gray-100 dark:border-dark-border mb-0 pattern-dots" style="min-height:420px;">
+                    <!-- 浮动光球 -->
+                    <div class="orb orb-1"></div>
+                    <div class="orb orb-2"></div>
+                    <div class="orb orb-3"></div>
+                    <!-- 旋转装饰环 -->
+                    <div class="hero-ring hero-ring-1"></div>
+                    <div class="hero-ring hero-ring-2"></div>
+                    <div class="hero-ring hero-ring-3"></div>
+                    <!-- 闪烁粒子 -->
+                    <div class="sparkle" style="top:15%;left:10%;--dur:3s;--delay:0s;"></div>
+                    <div class="sparkle" style="top:25%;left:75%;--dur:3.5s;--delay:1.2s;"></div>
+                    <div class="sparkle" style="top:60%;left:20%;--dur:2.8s;--delay:0.5s;"></div>
+                    <div class="sparkle" style="top:70%;left:85%;--dur:4s;--delay:2s;"></div>
+                    <div class="sparkle" style="top:40%;left:50%;--dur:3.2s;--delay:0.8s;"></div>
+                    <div class="sparkle" style="top:80%;left:40%;--dur:3.6s;--delay:1.8s;"></div>
+                    <div class="sparkle" style="top:10%;left:55%;--dur:3.1s;--delay:2.5s;"></div>
+                    <div class="sparkle" style="top:50%;left:90%;--dur:3.8s;--delay:0.3s;"></div>
+                    <div class="sparkle" style="top:35%;left:30%;--dur:2.5s;--delay:1.5s;"></div>
+                    <div class="sparkle" style="top:65%;left:65%;--dur:3.3s;--delay:0.7s;"></div>
+                    <div class="sparkle" style="top:20%;left:45%;--dur:2.9s;--delay:2.1s;"></div>
+                    <div class="hover-ripple-ring" style="width:120px;height:120px;top:30%;left:20%;animation-delay:0s;"></div>
+                    <div class="hover-ripple-ring" style="width:80px;height:80px;top:60%;left:75%;animation-delay:0.9s;"></div>
+                    <div class="relative z-10 py-16 px-8 text-center">
+                        <span class="inline-block px-4 py-1.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs font-bold rounded-full tracking-wider mb-6 breathe tag-neon">发现您的下一台完美笔记本</span>
+                        <h1 class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-4 tracking-tight">
+                            笔记本电脑<span class="gradient-text">评价系统</span>
+                        </h1>
+                        <p class="text-gray-500 dark:text-gray-400 text-lg max-w-2xl mx-auto mb-8">
+                            基于真实用户评价，帮您做出明智选择。
+                        </p>
+                        <div class="flex justify-center gap-4 flex-wrap">
+                            <button @click="showBuyingGuide = true; guideStep = 1" class="magnetic-btn glow-pulse bg-blue-600 text-white font-bold px-8 py-3.5 rounded-2xl hover:bg-blue-700 transition duration-300 shadow-xl flex items-center">
+                                <i class="fas fa-magic mr-2"></i> 智能选机
+                            </button>
+                            <button @click="currentView = 'brands'" class="magnetic-btn bg-white dark:bg-dark-bg text-gray-700 dark:text-gray-200 font-bold px-8 py-3.5 rounded-2xl border-2 border-gray-200 dark:border-dark-border hover:border-blue-400 dark:hover:border-blue-500 transition duration-300 flex items-center">
+                                <i class="fas fa-tag mr-2"></i> 浏览品牌
+                            </button>
+                        </div>
+                        <!-- 滚动指示器 -->
+                        <div class="scroll-indicator mt-8">
+                            <span class="text-[10px] text-gray-300 dark:text-gray-600 uppercase tracking-widest mb-1">向下滚动</span>
+                            <i class="fas fa-chevron-down text-gray-300 dark:text-gray-600 text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SVG 波浪分隔线 -->
+                <div class="wave-container mb-8">
+                    <svg viewBox="0 0 1200 120" preserveAspectRatio="none" style="width:200%;height:80px;">
+                        <path d="M0,0 C150,80 350,0 600,60 C850,120 1050,40 1200,80 L1200,120 L0,120 Z" fill="currentColor" class="text-blue-600/10 dark:text-blue-400/10"></path>
+                        <path d="M0,20 C200,80 400,40 600,80 C800,120 1000,60 1200,100 L1200,120 L0,120 Z" fill="currentColor" class="text-blue-600/5 dark:text-blue-400/5"></path>
+                    </svg>
+                </div>
+
+                <div class="bg-white dark:bg-dark-card rounded-2xl shadow-float border border-gray-100 dark:border-dark-border p-6 mb-8">
                     <div class="flex flex-col md:flex-row md:items-center justify-between mb-6">
                         <h2 class="text-2xl font-bold text-gray-800 dark:text-white">发现您的下一台完美笔记本</h2>
                         <button @click="showBuyingGuide = true; guideStep = 1" class="text-sm font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center mt-2 md:mt-0">
@@ -207,6 +278,9 @@
                     </div>
                 </div>
 
+                <!-- 渐变分隔线 -->
+                <div class="gradient-divider mb-8"></div>
+
                 <!-- 笔记本列表 -->
                 <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     <div v-for="i in 8" :key="i" class="bg-white dark:bg-dark-card rounded-2xl overflow-hidden shadow-sm border border-gray-100 dark:border-dark-border animate-pulse">
@@ -229,22 +303,29 @@
                     <p class="text-gray-500 dark:text-gray-400 text-lg">没有找到符合条件的笔记本</p>
                 </div>
                 <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    <div v-for="laptop in laptops" :key="laptop.laptop_id" @click="showLaptopDetail(laptop.laptop_id)" 
-                        class="bg-white dark:bg-dark-card rounded-2xl overflow-hidden shadow-sm hover:shadow-xl dark:hover:shadow-blue-900/20 transition-all duration-300 cursor-pointer border border-gray-100 dark:border-dark-border group">
-                        <div class="h-48 bg-gray-100 dark:bg-dark-bg relative overflow-hidden">
+                    <div v-for="laptop in laptops" :key="laptop.laptop_id" @click="showLaptopDetail(laptop.laptop_id)"
+                        class="shimmer-border tilt-card laptop-card bg-white dark:bg-dark-card rounded-2xl overflow-hidden shadow-sm hover:shadow-xl dark:hover:shadow-blue-900/20 transition-all duration-300 cursor-pointer border border-gray-100 dark:border-dark-border group">
+                        <div class="card-glow"></div>
+                        <div class="rainbow-overlay"></div>
+                        <div class="h-48 bg-gray-100 dark:bg-dark-bg relative overflow-hidden laptop-img-container">
+                            <!-- 真实图片 -->
+                            <img v-if="laptop.image_url" :src="laptop.image_url" :alt="laptop.model"
+                                class="absolute inset-0 w-full h-full object-cover"
+                                @error="e => e.target.style.display='none'">
+                            <!-- 无图片时的默认图标 -->
                             <div class="absolute inset-0 flex items-center justify-center text-gray-300 dark:text-gray-700">
                                 <i class="fas fa-laptop text-7xl opacity-50"></i>
                             </div>
-                            <div class="absolute top-4 left-4 bg-white/90 dark:bg-dark-card/90 backdrop-blur px-2 py-1 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900">
+                            <div class="absolute top-4 left-4 bg-white/90 dark:bg-dark-card/90 backdrop-blur px-2 py-1 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900 brand-label">
                                 {{ laptop.brand_name }}
                             </div>
                             <div class="absolute top-4 right-4 flex flex-col space-y-2">
-                                <button @click.stop="toggleCompare(laptop)" 
+                                <button @click.stop="toggleCompare(laptop)"
                                     class="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm"
                                     :class="isInCompare(laptop.laptop_id) ? 'bg-blue-600 text-white' : 'bg-white/90 dark:bg-dark-card/90 text-gray-400 hover:text-blue-600'">
                                     <i class="fas fa-columns"></i>
                                 </button>
-                                <button @click.stop="toggleWishlist(laptop)" 
+                                <button @click.stop="toggleWishlist(laptop)"
                                     class="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm"
                                     :class="isInWishlist(laptop.laptop_id) ? 'bg-red-500 text-white' : 'bg-white/90 dark:bg-dark-card/90 text-gray-400 hover:text-red-500'">
                                     <i class="fas fa-heart"></i>
@@ -255,7 +336,7 @@
                             <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{{ laptop.model }}</h3>
                             <p class="text-gray-500 dark:text-gray-400 text-sm mb-4 line-clamp-2">{{ laptop.specifications }}</p>
                             <div class="flex justify-between items-center mt-auto">
-                                <span class="text-xl font-black text-red-500">¥{{ laptop.price }}</span>
+                                <span class="text-xl font-black text-red-500 price-tag">¥{{ laptop.price }}</span>
                                 <div class="flex items-center space-x-1">
                                     <i class="fas fa-star text-yellow-400 text-sm"></i>
                                     <span class="text-sm font-bold text-gray-700 dark:text-gray-200">{{ formatScore(laptop.avg_score) }}</span>
@@ -299,8 +380,12 @@
                 <div v-else-if="selectedLaptop">
                     <div class="bg-white dark:bg-dark-card rounded-3xl shadow-xl overflow-hidden border border-gray-50 dark:border-dark-border mb-8">
                         <div class="md:flex">
-                            <div class="md:w-1/2 bg-gray-50 dark:bg-dark-bg p-12 flex items-center justify-center border-r border-gray-100 dark:border-dark-border">
-                                <i class="fas fa-laptop text-[160px] text-gray-200 dark:text-gray-800"></i>
+                            <div class="md:w-1/2 bg-gray-50 dark:bg-dark-bg p-8 flex items-center justify-center border-r border-gray-100 dark:border-dark-border img-magnifier-container">
+                                <img v-if="selectedLaptop.image_url" :src="selectedLaptop.image_url" :alt="selectedLaptop.model"
+                                    class="max-w-full max-h-[400px] object-contain rounded-2xl"
+                                    @error="e => e.target.style.display='none'">
+                                <div class="magnifier-hint"><i class="fas fa-search-plus mr-1"></i>悬停放大</div>
+                                <i v-if="!selectedLaptop.image_url" class="fas fa-laptop text-[160px] text-gray-200 dark:text-gray-800"></i>
                             </div>
                             <div class="md:w-1/2 p-10">
                                 <div class="flex items-center space-x-3 mb-4">
@@ -333,9 +418,17 @@
 
                                 <!-- 评分雷达图 -->
                                 <div v-if="selectedLaptop.stats" class="mb-8 p-4 bg-white dark:bg-dark-bg rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm">
-                                    <h4 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 text-center">评分分布</h4>
+                                    <h4 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 text-center">评分雷达</h4>
                                     <div class="h-64 relative">
                                         <canvas id="scoreRadarChart"></canvas>
+                                    </div>
+                                </div>
+
+                                <!-- 评分分布柱状图 -->
+                                <div class="mb-8 p-4 bg-white dark:bg-dark-bg rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm">
+                                    <h4 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 text-center">评分分布</h4>
+                                    <div class="h-48 relative">
+                                        <canvas id="scoreBarChart"></canvas>
                                     </div>
                                 </div>
 
@@ -533,8 +626,9 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <div v-for="rec in recommendations" :key="rec.laptop_id" @click="showLaptopDetail(rec.laptop_id)" 
                                 class="bg-white dark:bg-dark-card rounded-2xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer border border-gray-100 dark:border-dark-border group">
-                                <div class="aspect-video bg-gray-50 dark:bg-dark-bg rounded-xl mb-4 flex items-center justify-center text-gray-300 dark:text-gray-700 group-hover:text-blue-200 dark:group-hover:text-blue-800 transition-colors">
-                                    <i class="fas fa-laptop text-4xl"></i>
+                                <div class="aspect-video bg-gray-50 dark:bg-dark-bg rounded-xl mb-4 flex items-center justify-center overflow-hidden">
+                                    <img v-if="rec.image_url" :src="rec.image_url" :alt="rec.model" class="w-full h-full object-cover" @error="e => e.target.style.display='none'">
+                                    <i v-if="!rec.image_url" class="fas fa-laptop text-4xl text-gray-300 dark:text-gray-700 group-hover:text-blue-200 dark:group-hover:text-blue-800 transition-colors"></i>
                                 </div>
                                 <h3 class="font-bold text-gray-800 dark:text-white mb-1 truncate">{{ rec.model }}</h3>
                                 <div class="flex justify-between items-center">
@@ -552,7 +646,7 @@
 
             <!-- 3. 登录页 -->
             <div v-if="currentView === 'login'" class="max-w-md mx-auto py-10">
-                <div class="bg-white dark:bg-dark-card rounded-3xl shadow-2xl p-10 border border-gray-100 dark:border-dark-border">
+                <div class="auth-card bg-white dark:bg-dark-card rounded-3xl shadow-2xl p-10 border border-gray-100 dark:border-dark-border">
                     <div class="text-center mb-10">
                         <div class="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-4">
                             <i class="fas fa-user-lock text-3xl"></i>
@@ -587,7 +681,7 @@
 
             <!-- 4. 注册页 -->
             <div v-if="currentView === 'register'" class="max-w-xl mx-auto py-10">
-                <div class="bg-white dark:bg-dark-card rounded-3xl shadow-2xl p-10 border border-gray-100 dark:border-dark-border">
+                <div class="auth-card bg-white dark:bg-dark-card rounded-3xl shadow-2xl p-10 border border-gray-100 dark:border-dark-border">
                     <div class="text-center mb-10">
                         <div class="w-16 h-16 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-2xl flex items-center justify-center mx-auto mb-4">
                             <i class="fas fa-user-plus text-3xl"></i>
@@ -732,17 +826,151 @@
 
                 <h2 class="text-3xl font-black mb-8 text-gray-800 dark:text-white">所有品牌</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    <div v-for="brand in brands" :key="brand.brand_id" 
-                        class="bg-white dark:bg-dark-card rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-dark-border group">
-                        <div class="w-16 h-16 bg-gray-50 dark:bg-dark-bg rounded-2xl flex items-center justify-center mb-6 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 transition-colors">
-                            <i class="fas fa-tag text-2xl text-gray-300 dark:text-gray-700 group-hover:text-blue-400"></i>
+                    <div v-for="brand in brands" :key="brand.brand_id"
+                        class="flip-container cursor-pointer" style="min-height:280px;" @click="showBrandDetail(brand.brand_id)" @dblclick.stop>
+                        <div class="flip-card h-full">
+                            <!-- 正面 -->
+                            <div class="flip-front h-full">
+                                <div class="brand-card bg-white dark:bg-dark-card rounded-3xl p-8 h-full shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-dark-border group">
+                                    <div class="w-16 h-16 bg-gray-50 dark:bg-dark-bg rounded-2xl flex items-center justify-center mb-6 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 transition-colors brand-icon-float">
+                                        <i class="fas fa-building-flag text-2xl text-gray-300 dark:text-gray-700 group-hover:text-blue-400"></i>
+                                    </div>
+                                    <h3 class="text-2xl font-bold text-gray-800 dark:text-white mb-2">{{ brand.brand_name }}</h3>
+                                    <p class="text-gray-500 dark:text-gray-400 text-sm mb-6 line-clamp-3">{{ brand.description || '暂无品牌简介' }}</p>
+                                    <div class="flex items-center justify-between mt-auto pt-6 border-t border-gray-50 dark:border-dark-border">
+                                        <span class="text-xs text-gray-400">总部: {{ brand.headquarters || '未知' }}</span>
+                                        <span class="text-xs text-blue-400 font-bold group-hover:underline">查看详情 →</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- 背面 -->
+                            <div class="flip-back h-full">
+                                <div class="bg-white dark:bg-dark-card rounded-3xl p-8 h-full border border-gray-100 dark:border-dark-border flex flex-col justify-center items-center text-center bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
+                                    <i class="fas fa-globe text-4xl text-blue-400 mb-4"></i>
+                                    <h3 class="text-xl font-black text-gray-800 dark:text-white mb-3">{{ brand.brand_name }}</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-2"><i class="fas fa-map-marker-alt mr-1 text-blue-400"></i>{{ brand.headquarters || '未知总部' }}</p>
+                                    <p v-if="brand.founded_date" class="text-sm text-gray-500 dark:text-gray-400 mb-4"><i class="fas fa-calendar mr-1 text-blue-400"></i>成立于 {{ brand.founded_date }}</p>
+                                    <a v-if="brand.official_website" :href="brand.official_website" target="_blank" class="text-blue-600 font-bold hover:underline text-sm" @click.stop><i class="fas fa-external-link-alt mr-1"></i>访问官网</a>
+                                    <button @click.stop="showBrandDetail(brand.brand_id)" class="mt-4 px-6 py-2 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition">进入品牌主页</button>
+                                </div>
+                            </div>
                         </div>
-                        <h3 class="text-2xl font-bold text-gray-800 dark:text-white mb-2">{{ brand.brand_name }}</h3>
-                        <p class="text-gray-500 dark:text-gray-400 text-sm mb-6 line-clamp-3">{{ brand.description || '暂无品牌简介' }}</p>
-                        <div class="flex items-center justify-between mt-auto pt-6 border-t border-gray-50 dark:border-dark-border">
-                            <span class="text-xs text-gray-400">总部: {{ brand.headquarters || '未知' }}</span>
-                            <button @click="filters.brand_id = brand.brand_id; goToHome()" 
-                                class="text-blue-600 dark:text-blue-400 font-bold hover:underline">查看产品</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 品牌详情页 (含时间线) -->
+            <div v-if="currentView === 'brandDetail'" class="max-w-5xl mx-auto">
+                <button @click="currentView = 'brands'" class="mb-6 flex items-center text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">
+                    <i class="fas fa-arrow-left mr-2"></i>返回品牌列表
+                </button>
+
+                <div v-if="loading && !selectedBrand" class="animate-pulse space-y-6">
+                    <div class="h-10 bg-gray-200 dark:bg-dark-bg rounded w-1/3"></div>
+                    <div class="h-64 bg-gray-200 dark:bg-dark-bg rounded-3xl"></div>
+                </div>
+
+                <div v-else-if="selectedBrand">
+                    <div class="bg-white dark:bg-dark-card rounded-3xl shadow-lg border border-gray-100 dark:border-dark-border p-10 mb-8">
+                        <div class="flex items-center space-x-4 mb-6">
+                            <div class="w-20 h-20 bg-blue-50 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center brand-icon-float">
+                                <i class="fas fa-building-flag text-3xl text-blue-600 dark:text-blue-400"></i>
+                            </div>
+                            <div>
+                                <h1 class="text-4xl font-black text-gray-800 dark:text-white">{{ selectedBrand.brand_name }}</h1>
+                                <div class="flex items-center space-x-4 mt-2 text-sm text-gray-400">
+                                    <span><i class="fas fa-map-marker-alt mr-1"></i>{{ selectedBrand.headquarters || '未知' }}</span>
+                                    <span v-if="selectedBrand.founded_date"><i class="fas fa-calendar mr-1"></i>成立于 {{ selectedBrand.founded_date }}</span>
+                                    <a v-if="selectedBrand.official_website" :href="selectedBrand.official_website" target="_blank" class="text-blue-500 hover:underline"><i class="fas fa-globe mr-1"></i>官网</a>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-gray-600 dark:text-gray-400 leading-relaxed">{{ selectedBrand.description || '暂无品牌简介' }}</p>
+
+                        <!-- 品牌统计 -->
+                        <div v-if="brandStats" class="grid grid-cols-3 gap-6 mt-8">
+                            <div class="bg-gray-50 dark:bg-dark-bg rounded-2xl p-5 text-center">
+                                <div class="text-3xl font-black text-blue-600 dark:text-blue-400">{{ brandStats.laptop_count || 0 }}</div>
+                                <div class="text-xs text-gray-400 font-bold mt-1 uppercase">在售机型</div>
+                            </div>
+                            <div class="bg-gray-50 dark:bg-dark-bg rounded-2xl p-5 text-center">
+                                <div class="text-3xl font-black text-green-600 dark:text-green-400">{{ brandStats.total_reviews || 0 }}</div>
+                                <div class="text-xs text-gray-400 font-bold mt-1 uppercase">用户评价</div>
+                            </div>
+                            <div class="bg-gray-50 dark:bg-dark-bg rounded-2xl p-5 text-center">
+                                <div class="text-3xl font-black text-yellow-600 dark:text-yellow-400">{{ brandStats.avg_score ? Number(brandStats.avg_score).toFixed(1) : '-' }}</div>
+                                <div class="text-xs text-gray-400 font-bold mt-1 uppercase">综合评分</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 品牌发展时间线 -->
+                    <div class="mb-8">
+                        <h2 class="text-2xl font-black mb-8 flex items-center text-gray-800 dark:text-white">
+                            <i class="fas fa-timeline text-blue-500 mr-3"></i>
+                            品牌里程碑
+                        </h2>
+                        <div class="relative pl-10">
+                            <!-- 时间线竖线 -->
+                            <div class="absolute left-[19px] top-2 bottom-2 w-0.5 bg-gradient-to-b from-blue-500 via-purple-500 to-pink-400 rounded-full"></div>
+
+                            <div class="timeline-item space-y-10" style="--tl-dir:30px">
+                                <div class="relative">
+                                    <div class="timeline-dot absolute -left-[31px] top-1.5"></div>
+                                    <div class="bg-white dark:bg-dark-card rounded-2xl p-6 border border-gray-100 dark:border-dark-border shadow-sm">
+                                        <span class="text-xs font-bold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full">{{ selectedBrand.founded_date || '创立初期' }}</span>
+                                        <h3 class="text-lg font-bold text-gray-800 dark:text-white mt-3 mb-2">品牌创立</h3>
+                                        <p class="text-gray-500 dark:text-gray-400 text-sm">{{ selectedBrand.brand_name }} 正式成立，总部位于{{ selectedBrand.headquarters || '全球' }}，开启笔记本电脑研发之路。</p>
+                                    </div>
+                                </div>
+                                <div class="relative">
+                                    <div class="timeline-dot absolute -left-[31px] top-1.5" style="background:#8b5cf6;box-shadow:0 0 0 4px rgba(139,92,246,0.2);"></div>
+                                    <div class="bg-white dark:bg-dark-card rounded-2xl p-6 border border-gray-100 dark:border-dark-border shadow-sm">
+                                        <span class="text-xs font-bold text-purple-500 bg-purple-50 dark:bg-purple-900/30 px-3 py-1 rounded-full">产品发布</span>
+                                        <h3 class="text-lg font-bold text-gray-800 dark:text-white mt-3 mb-2">首款旗舰产品问世</h3>
+                                        <p class="text-gray-500 dark:text-gray-400 text-sm">推出首款自主研发笔记本电脑，标志着{{ selectedBrand.brand_name }}正式进入笔记本市场，凭借创新设计获得广泛关注。</p>
+                                    </div>
+                                </div>
+                                <div class="relative">
+                                    <div class="timeline-dot absolute -left-[31px] top-1.5" style="background:#ec4899;box-shadow:0 0 0 4px rgba(236,72,153,0.2);"></div>
+                                    <div class="bg-white dark:bg-dark-card rounded-2xl p-6 border border-gray-100 dark:border-dark-border shadow-sm">
+                                        <span class="text-xs font-bold text-pink-500 bg-pink-50 dark:bg-pink-900/30 px-3 py-1 rounded-full">市场扩张</span>
+                                        <h3 class="text-lg font-bold text-gray-800 dark:text-white mt-3 mb-2">全球市场布局</h3>
+                                        <p class="text-gray-500 dark:text-gray-400 text-sm">产品线全面铺开，目前已有 {{ brandStats?.laptop_count || '多' }} 款在售机型，累计获得 {{ brandStats?.total_reviews || '大量' }} 条用户评价。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 该品牌笔记本列表 -->
+                    <h2 class="text-2xl font-black mb-6 flex items-center text-gray-800 dark:text-white">
+                        <i class="fas fa-laptop text-blue-500 mr-3"></i>
+                        {{ selectedBrand.brand_name }} 在售产品
+                    </h2>
+                    <div v-if="brandLaptops.length === 0" class="text-center py-10 text-gray-400">
+                        <i class="fas fa-box-open text-4xl mb-3 opacity-30"></i>
+                        <p>暂无产品数据</p>
+                    </div>
+                    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div v-for="laptop in brandLaptops" :key="laptop.laptop_id" @click="showLaptopDetail(laptop.laptop_id)"
+                            class="shimmer-border tilt-card laptop-card bg-white dark:bg-dark-card rounded-2xl overflow-hidden shadow-sm hover:shadow-xl dark:hover:shadow-blue-900/20 transition-all duration-300 cursor-pointer border border-gray-100 dark:border-dark-border group">
+                            <div class="card-glow"></div>
+                            <div class="rainbow-overlay"></div>
+                            <div class="h-40 bg-gray-100 dark:bg-dark-bg relative overflow-hidden flex items-center justify-center">
+                                <img v-if="laptop.image_url" :src="laptop.image_url" :alt="laptop.model" class="absolute inset-0 w-full h-full object-cover" @error="e => e.target.style.display='none'">
+                                <i class="fas fa-laptop text-6xl text-gray-300 dark:text-gray-700 opacity-50" v-if="!laptop.image_url"></i>
+                            </div>
+                            <div class="p-4">
+                                <h3 class="font-bold text-gray-800 dark:text-white mb-1 group-hover:text-blue-600 transition-colors">{{ laptop.model }}</h3>
+                                <div class="flex justify-between items-center mt-3">
+                                    <span class="text-lg font-black text-red-500 price-tag">¥{{ laptop.price }}</span>
+                                    <div class="flex items-center space-x-1">
+                                        <i class="fas fa-star text-yellow-400 text-xs"></i>
+                                        <span class="text-sm font-bold text-gray-700 dark:text-gray-200">{{ formatScore(laptop.avg_score) }}</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1118,11 +1346,11 @@
         </footer>
 
         <!-- 对比栏 (吸底) -->
-        <div v-if="compareList.length > 0" 
+        <div v-if="compareList.length > 0"
             class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white/80 dark:bg-dark-card/80 backdrop-blur-xl border border-white/20 dark:border-dark-border shadow-2xl rounded-2xl px-6 py-4 flex items-center space-x-6 z-40 animate-bounce-in">
-            <div class="flex -space-x-3">
-                <div v-for="item in compareList" :key="item.laptop_id" 
-                    class="w-12 h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center border-2 border-white dark:border-dark-card shadow-lg relative group">
+            <div class="flex -space-x-3" id="compareBar">
+                <div v-for="item in compareList" :key="item.laptop_id" draggable="true"
+                    class="drag-item w-12 h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center border-2 border-white dark:border-dark-card shadow-lg relative group">
                     <i class="fas fa-laptop"></i>
                     <button @click="toggleCompare(item)" class="absolute -top-2 -right-2 bg-red-500 text-white w-5 h-5 rounded-full text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">
                         <i class="fas fa-times"></i>
@@ -1328,6 +1556,10 @@
                         <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">屏幕尺寸 (英寸)</label>
                         <input v-model="laptopForm.screen_size" type="number" step="0.1" class="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-transparent dark:border-dark-border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 dark:text-white">
                     </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">产品图片 URL</label>
+                        <input v-model="laptopForm.image_url" type="url" placeholder="https://example.com/laptop.jpg" class="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-transparent dark:border-dark-border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 dark:text-white">
+                    </div>
                     <div class="col-span-2">
                         <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">详细参数 (CPU, 内存, 显卡等)</label>
                         <textarea v-model="laptopForm.specifications" required rows="4" class="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-transparent dark:border-dark-border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"></textarea>
@@ -1429,14 +1661,20 @@
                             <p class="text-gray-400">正在为您精准匹配...</p>
                         </div>
                         <div v-else-if="guideResult">
-                            <div class="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-4">
-                                <i class="fas fa-gift text-3xl"></i>
+                            <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                                <i class="fas fa-robot text-3xl"></i>
                             </div>
-                            <h4 class="text-lg font-bold text-gray-800 dark:text-white">为您推荐的完美机型</h4>
-                            <div class="bg-gray-50 dark:bg-dark-bg p-6 rounded-2xl border border-gray-100 dark:border-dark-border my-6">
+                            <h4 class="text-lg font-bold text-gray-800 dark:text-white">AI 为您推荐的完美机型</h4>
+                            <div class="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 p-6 rounded-2xl border border-blue-100 dark:border-blue-900/30 my-6">
                                 <div class="text-blue-600 font-bold text-xs uppercase mb-1">{{ guideResult.brand_name }}</div>
                                 <div class="text-xl font-black text-gray-800 dark:text-white mb-2">{{ guideResult.model }}</div>
                                 <div class="text-red-500 font-black text-2xl">¥{{ guideResult.price }}</div>
+                                <div v-if="guideResult.ai_reason" class="mt-3 pt-3 border-t border-blue-200 dark:border-blue-900/40 text-sm text-gray-600 dark:text-gray-400 text-left">
+                                    <i class="fas fa-lightbulb text-yellow-500 mr-1"></i> {{ guideResult.ai_reason }}
+                                </div>
+                            </div>
+                            <div v-if="guideAITips" class="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-900/30 rounded-xl p-4 text-sm text-gray-600 dark:text-gray-400">
+                                <i class="fas fa-star text-yellow-500 mr-1"></i> {{ guideAITips }}
                             </div>
                             <div class="flex space-x-3">
                                 <button @click="showLaptopDetail(guideResult.laptop_id); showBuyingGuide = false" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition">
@@ -1462,18 +1700,488 @@
             <i :class="toast.type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'"></i>
             <span class="font-bold">{{ toast.message }}</span>
         </div>
+
+        <!-- 滚动进度环 -->
+        <svg class="progress-ring-container" id="progressRing" width="60" height="60" viewBox="0 0 60 60">
+            <circle class="progress-ring-bg" cx="30" cy="30" r="26"/>
+            <circle class="progress-ring-fill" id="progressRingFill" cx="30" cy="30" r="26" stroke-dasharray="163.36" stroke-dashoffset="163.36"/>
+        </svg>
+        <!-- 回到顶部 -->
+        <div class="back-to-top" id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+            <i class="fas fa-arrow-up"></i>
+        </div>
     </div>
 
     <script src="js/api.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/effects.js"></script>
     <script>
+    (function() {
+        'use strict';
+        // ========== Vue 挂载检测 ==========
         window.addEventListener('load', () => {
-            if (document.getElementById('app').__vue_app__) {
-                console.log('Vue 3 应用挂载成功');
-            } else {
-                console.error('Vue 3 应用挂载失败');
-            }
+            console.log(document.getElementById('app').__vue_app__ ? 'Vue 3 应用挂载成功' : 'Vue 3 应用挂载失败');
         });
+
+        // ========== 1. 全局浮动微粒 ==========
+        (function createFloatingParticles() {
+            const colors = [
+                'rgba(59,130,246,0.12)', 'rgba(139,92,246,0.1)', 'rgba(236,72,153,0.08)',
+                'rgba(16,185,129,0.08)', 'rgba(245,158,11,0.07)',
+            ];
+            const sizes = [4,6,8,10,14];
+            const anims = ['particleFloat1','particleFloat2','particleFloat3'];
+            for (let i = 0; i < 15; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'floating-particle';
+                dot.style.cssText = `--x:${Math.random()*100}%;--dx:${(Math.random()-0.5)*200}px;--dur:${8+Math.random()*16}s;--delay:${Math.random()*12}s;--anim:${anims[i%3]};width:${sizes[i%5]}px;height:${sizes[i%5]}px;background:${colors[i%5]}`;
+                document.body.appendChild(dot);
+            }
+        })();
+
+        // ========== 2. 打字机效果 ==========
+        (function typewriter() {
+            const phrases = [
+                '汇聚真实用户评价，智能对比分析，帮您找到最适合的笔记本电脑',
+                '覆盖联想/戴尔/苹果/华为等全品牌，海量数据精准推荐',
+                '想打游戏流畅不卡？设计师需要高色域？来这里就对了',
+                '从学生本到工作站，每一台都经过真实用户口碑验证',
+            ];
+            const el = document.getElementById('typewriterText');
+            const cursor = document.getElementById('typewriterCursor');
+            if (!el || !cursor) return;
+            let phraseIdx = 0, charIdx = 0, deleting = false;
+            function tick() {
+                const phrase = phrases[phraseIdx];
+                if (deleting) {
+                    el.textContent = phrase.substring(0, charIdx--);
+                    if (charIdx < 0) { deleting = false; phraseIdx = (phraseIdx + 1) % phrases.length; charIdx = 0; }
+                    setTimeout(tick, 40);
+                } else {
+                    el.textContent = phrase.substring(0, charIdx++);
+                    if (charIdx > phrase.length) { setTimeout(() => { deleting = true; tick(); }, 2000); return; }
+                    setTimeout(tick, 60 + Math.random() * 40);
+                }
+            }
+            tick();
+        })();
+
+        // ========== 3. 粒子连线星座网 ==========
+        (function particleConstellation() {
+            const canvas = document.getElementById('particleCanvas');
+            const ctx = canvas.getContext('2d');
+            const particles = [];
+            const count = 20;
+            let w, h;
+
+            function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+            resize(); window.addEventListener('resize', resize);
+
+            for (let i = 0; i < count; i++) {
+                particles.push({ x: Math.random()*w, y: Math.random()*h, vx: (Math.random()-0.5)*0.4, vy: (Math.random()-0.5)*0.4, r: Math.random()*2+1 });
+            }
+
+            let mouseX = -200, mouseY = -200;
+            document.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
+            document.addEventListener('mouseleave', () => { mouseX = -200; mouseY = -200; });
+
+            function draw() {
+                ctx.clearRect(0, 0, w, h);
+                particles.forEach(p => {
+                    p.x += p.vx; p.y += p.vy;
+                    if (p.x < 0) p.x = w; if (p.x > w) p.x = 0;
+                    if (p.y < 0) p.y = h; if (p.y > h) p.y = 0;
+                });
+                // 粒子间连线
+                for (let i = 0; i < count; i++) {
+                    for (let j = i+1; j < count; j++) {
+                        const dx = particles[i].x - particles[j].x;
+                        const dy = particles[i].y - particles[j].y;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        if (dist < 120) {
+                            ctx.beginPath();
+                            ctx.moveTo(particles[i].x, particles[i].y);
+                            ctx.lineTo(particles[j].x, particles[j].y);
+                            ctx.strokeStyle = `rgba(59,130,246,${0.08 * (1 - dist/120)})`;
+                            ctx.lineWidth = 0.5;
+                            ctx.stroke();
+                        }
+                    }
+                }
+                // 鼠标附近连线
+                particles.forEach(p => {
+                    const dx = p.x - mouseX;
+                    const dy = p.y - mouseY;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < 180) {
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(mouseX, mouseY);
+                        ctx.strokeStyle = `rgba(59,130,246,${0.2 * (1 - dist/180)})`;
+                        ctx.lineWidth = 0.8;
+                        ctx.stroke();
+                    }
+                });
+                // 粒子本身
+                particles.forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+                    ctx.fillStyle = 'rgba(59,130,246,0.25)';
+                    ctx.fill();
+                });
+                requestAnimationFrame(draw);
+            }
+            draw();
+        })();
+
+        // ========== 4. 视差滚动 ==========
+        (function parallax() {
+            const layers = [
+                { sel: '.orb-1', speed: 0.03 },
+                { sel: '.orb-2', speed: -0.04 },
+                { sel: '.orb-3', speed: 0.025 },
+                { sel: '.hero-ring-1', speed: 0.015 },
+                { sel: '.hero-ring-2', speed: -0.02 },
+                { sel: '.hero-ring-3', speed: 0.018 },
+                { sel: '.sparkle', speed: 0.05, all: true },
+            ];
+            window.addEventListener('scroll', () => {
+                const sy = window.scrollY;
+                layers.forEach(layer => {
+                    const els = layer.all ? document.querySelectorAll(layer.sel) : [document.querySelector(layer.sel)].filter(Boolean);
+                    els.forEach(el => {
+                        el.style.transform = el.style.transform.replace(/translateY\([^)]*\)/, '') + ` translateY(${sy * layer.speed}px)`;
+                    });
+                });
+            }, { passive: true });
+        })();
+
+        // ========== 5. 滚动进度环 + 回到顶部 ==========
+        (function scrollProgress() {
+            const ring = document.getElementById('progressRing');
+            const fill = document.getElementById('progressRingFill');
+            const btt = document.getElementById('backToTop');
+            const circumference = 163.36;
+            window.addEventListener('scroll', () => {
+                const sy = window.scrollY;
+                const docH = document.documentElement.scrollHeight - window.innerHeight;
+                const progress = docH > 0 ? Math.min(sy / docH, 1) : 0;
+                if (fill) fill.style.strokeDashoffset = circumference * (1 - progress);
+                const visible = sy > 500;
+                [ring, btt].forEach(el => { if (el) el.classList.toggle('visible', visible); });
+            }, { passive: true });
+        })();
+
+        // ========== 6. 悬停涟漪 ==========
+        (function hoverRipple() {
+            document.addEventListener('mouseenter', e => {
+                if (!e.target || !e.target.closest) return;
+                const card = e.target.closest('.laptop-card');
+                if (!card || card.querySelector('.hover-ripple-ring')) return;
+                const ring = document.createElement('div');
+                ring.className = 'hover-ripple-ring';
+                ring.style.cssText = 'width:60px;height:60px;top:50%;left:50%;';
+                card.appendChild(ring);
+                const interval = setInterval(() => {
+                    if (!document.body.contains(card)) { clearInterval(interval); return; }
+                    const r = document.createElement('div');
+                    r.className = 'hover-ripple-ring';
+                    r.style.cssText = 'width:60px;height:60px;top:50%;left:50%;';
+                    card.appendChild(r);
+                    setTimeout(() => r.remove(), 1800);
+                }, 1200);
+                card._rippleInterval = interval;
+            }, true);
+            document.addEventListener('mouseleave', e => {
+                if (!e.target || !e.target.closest) return;
+                const card = e.target.closest('.laptop-card');
+                if (card && card._rippleInterval) {
+                    clearInterval(card._rippleInterval);
+                    card._rippleInterval = null;
+                    card.querySelectorAll('.hover-ripple-ring').forEach(r => r.remove());
+                }
+            }, true);
+        })();
+
+        // ========== 7. 成功彩纸庆祝 ==========
+        window.spawnConfetti = function(x, y) {
+            const colors = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#ef4444','#6366f1','#f97316'];
+            const shapes = ['square','circle'];
+            for (let i = 0; i < 50; i++) {
+                const piece = document.createElement('div');
+                piece.className = 'confetti-piece';
+                const size = 6 + Math.random() * 10;
+                const shape = shapes[Math.floor(Math.random()*2)];
+                piece.style.cssText = `
+                    left:${x + (Math.random()-0.5)*300}px;top:${y}px;
+                    width:${size}px;height:${shape==='circle'?size:size*(0.4+Math.random()*0.6)}px;
+                    background:${colors[i%colors.length]};
+                    border-radius:${shape==='circle'?'50%':'2px'};
+                    --spin:${(Math.random()-0.5)*1080}deg;
+                    --sway:${20+Math.random()*80}px;
+                    --fall-dur:${2+Math.random()*3}s;
+                    --sway-dur:${0.8+Math.random()*1.6}s;
+                    --start-delay:${Math.random()*0.5}s;
+                `;
+                document.body.appendChild(piece);
+                setTimeout(() => piece.remove(), 4000);
+            }
+        };
+
+        // 监听 Vue 层的 toast 来触发彩纸 (通过 MutationObserver)
+        (function bindConfetti() {
+            const observer = new MutationObserver(mutations => {
+                for (const m of mutations) {
+                    for (const node of m.addedNodes) {
+                        if (node.classList && node.classList.contains('toast-enhanced') && node.classList.contains('toast-success')) {
+                            window.spawnConfetti(window.innerWidth/2, 100);
+                        }
+                    }
+                }
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        })();
+
+        // ========== 8. 卡片翻转 (双击翻转) ==========
+        document.addEventListener('dblclick', e => {
+            if (!e.target || !e.target.closest) return;
+            const card = e.target.closest('.flip-card');
+            if (card) card.classList.toggle('flipped');
+        });
+
+        // ========== 9. 拖拽对比排序 ==========
+        (function dragSort() {
+            let dragEl = null, placeholder = null, initY = 0, initIdx = 0;
+            document.addEventListener('dragstart', e => {
+                if (!e.target || !e.target.closest) return;
+                dragEl = e.target.closest('.drag-item');
+                if (!dragEl) return;
+                initIdx = [...dragEl.parentNode.children].indexOf(dragEl);
+                dragEl.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => {
+                    placeholder = document.createElement('div');
+                    placeholder.className = 'drag-item drag-placeholder';
+                    placeholder.style.height = dragEl.offsetHeight + 'px';
+                    dragEl.parentNode.insertBefore(placeholder, dragEl.nextSibling);
+                }, 0);
+            });
+            document.addEventListener('dragover', e => {
+                if (!dragEl || !e.target || !e.target.closest) return;
+                e.preventDefault();
+                const over = e.target.closest('.drag-item:not(.dragging):not(.drag-placeholder)');
+                document.querySelectorAll('.drag-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+                if (over) over.classList.add('drag-over');
+            });
+            document.addEventListener('drop', e => {
+                e.preventDefault();
+                if (!e.target || !e.target.closest) return;
+                const over = e.target.closest('.drag-item.drag-over');
+                if (over && placeholder && dragEl) {
+                    const parent = dragEl.parentNode;
+                    parent.insertBefore(dragEl, over);
+                }
+                cleanup();
+            });
+            document.addEventListener('dragend', cleanup);
+            function cleanup() {
+                if (dragEl) dragEl.classList.remove('dragging');
+                if (placeholder) placeholder.remove();
+                document.querySelectorAll('.drag-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+                dragEl = null; placeholder = null;
+            }
+        })();
+
+        // ========== 10. 导航栏磨砂玻璃 ==========
+        (function navGlass() {
+            const nav = document.getElementById('mainNav');
+            if (!nav) return;
+            window.addEventListener('scroll', () => {
+                nav.classList.toggle('nav-glass', window.scrollY > 30);
+                nav.classList.toggle('nav-scrolled', window.scrollY > 60);
+            }, { passive: true });
+        })();
+
+        // ========== 11. 3D卡片倾斜 + 磁性按钮 + 聚光灯 (合并 rAF) ==========
+        let tiltRaf = null;
+        const spotlight = document.getElementById('cursorSpotlight');
+        document.addEventListener('mousemove', e => {
+            if (spotlight) { spotlight.style.left = e.clientX + 'px'; spotlight.style.top = e.clientY + 'px'; }
+            if (tiltRaf) return;
+            tiltRaf = requestAnimationFrame(() => {
+                tiltRaf = null;
+                document.querySelectorAll('.tilt-card').forEach(card => {
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+                    const margin = 80;
+                    if (x < -margin || x > rect.width+margin || y < -margin || y > rect.height+margin) { card.style.transform = ''; return; }
+                    const inBounds = x >= 0 && x <= rect.width && y >= 0 && y <= rect.height;
+                    const rx = ((y - rect.height/2) / (rect.height/2)) * -5;
+                    const ry = ((x - rect.width/2) / (rect.width/2)) * 5;
+                    card.style.transform = `perspective(1200px) translateY(${inBounds?-8:0}px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+                    const glow = card.querySelector('.card-glow');
+                    if (glow) { glow.style.setProperty('--mx', `${(x/rect.width)*100}%`); glow.style.setProperty('--my', `${(y/rect.height)*100}%`); }
+                });
+                document.querySelectorAll('.magnetic-btn').forEach(btn => {
+                    const r = btn.getBoundingClientRect();
+                    const dx = e.clientX - r.left - r.width/2, dy = e.clientY - r.top - r.height/2;
+                    const dist = Math.sqrt(dx*dx+dy*dy), maxDist = 120;
+                    btn.style.transform = dist < maxDist ? `translate(${dx/dist*(1-dist/maxDist)*6}px,${dy/dist*(1-dist/maxDist)*6}px)` : '';
+                });
+            });
+        });
+        document.addEventListener('mouseleave', () => {
+            document.querySelectorAll('.tilt-card').forEach(c => { c.style.transform = ''; });
+            document.querySelectorAll('.magnetic-btn').forEach(b => { b.style.transform = ''; });
+        });
+
+        // ========== 12. 品牌时间线滚动显示 ==========
+        (function timelineObserver() {
+            const obs = new IntersectionObserver(entries => {
+                entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('revealed'); });
+            }, { threshold: 0.2 });
+            // 延迟观察 DOM 变化
+            const mo = new MutationObserver(() => {
+                document.querySelectorAll('.timeline-item').forEach(el => obs.observe(el));
+                document.querySelectorAll('.reveal-on-scroll').forEach(el => obs.observe(el));
+            });
+            mo.observe(document.getElementById('app'), { childList: true, subtree: true });
+            // 初始观察
+            setTimeout(() => {
+                document.querySelectorAll('.timeline-item, .reveal-on-scroll').forEach(el => obs.observe(el));
+            }, 500);
+        })();
+
+        // ========== 页面不可见时暂停重效果，节省 CPU/内存 ==========
+        let pageVisible = true;
+        document.addEventListener('visibilitychange', () => {
+            pageVisible = !document.hidden;
+            const canvas = document.getElementById('particleCanvas');
+            if (canvas) canvas.style.display = pageVisible ? '' : 'none';
+        });
+
+        console.log('所有美术效果已初始化 (1GB优化版): 打字机/粒子连线x20/视差/进度环/涟漪/彩纸x50/翻转/拖拽/磨砂玻璃/3D倾斜/磁性按钮/时间线');
+    })();
     </script>
+
+    <!-- AI 聊天窗口 -->
+    <button class="ai-chat-btn" id="aiChatBtn" onclick="toggleAIChat()" title="AI 笔记本顾问">
+        <i class="fas fa-robot"></i>
+    </button>
+    <div class="ai-chat-window collapsed" id="aiChatWindow">
+        <div class="ai-chat-header">
+            <div class="header-left">
+                <div class="ai-avatar">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="header-info">
+                    <span class="header-name">AI 笔记本顾问</span>
+                    <span class="header-status"><span class="online-dot"></span> 在线 · 随时为您推荐</span>
+                </div>
+            </div>
+            <button onclick="toggleAIChat()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="ai-chat-messages" id="aiChatMessages">
+            <div class="ai-msg assistant">
+                👋 你好！我是 AI 笔记本顾问。<br>
+                告诉我你的<b>预算</b>和<b>需求</b>，我帮你推荐最合适的笔记本！
+            </div>
+        </div>
+        <div class="ai-quick-questions">
+            <button class="ai-quick-btn" onclick="quickAsk('推荐一款5000元以内的办公本')">💼 办公本推荐</button>
+            <button class="ai-quick-btn" onclick="quickAsk('8000元以内玩游戏选什么')">🎮 游戏本推荐</button>
+            <button class="ai-quick-btn" onclick="quickAsk('性价比最高的轻薄本')">🥷 轻薄本推荐</button>
+            <button class="ai-quick-btn" onclick="quickAsk('设计专业用哪款比较好')">🎨 设计本推荐</button>
+        </div>
+        <div class="ai-chat-input">
+            <input type="text" id="aiChatInput" placeholder="输入你的需求..."
+                onkeydown="if(event.key==='Enter')sendAIChat()" />
+            <button onclick="sendAIChat()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+
+
+<script>
+// ==================== AI 聊天窗口逻辑 ====================
+(function() {
+    let isOpen = false;
+    let isSending = false;
+
+    window.toggleAIChat = function() {
+        isOpen = !isOpen;
+        const win = document.getElementById('aiChatWindow');
+        if (isOpen) {
+            win.classList.remove('collapsed');
+            setTimeout(() => {
+                document.getElementById('aiChatInput').focus();
+            }, 300);
+        } else {
+            win.classList.add('collapsed');
+        }
+    };
+
+    window.quickAsk = function(question) {
+        document.getElementById('aiChatInput').value = question;
+        sendAIChat();
+    };
+
+    window.sendAIChat = async function() {
+        const input = document.getElementById('aiChatInput');
+        const msg = input.value.trim();
+        if (!msg || isSending) return;
+        input.value = '';
+        isSending = true;
+
+        const msgs = document.getElementById('aiChatMessages');
+        // 用户消息
+        msgs.appendChild(createMsgEl(msg, 'user'));
+        // 加载指示器
+        const typingEl = createTypingEl();
+        msgs.appendChild(typingEl);
+        msgs.scrollTop = msgs.scrollHeight;
+
+        try {
+            const token = localStorage.getItem('token');
+            const resp = await fetch('/api/ai/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ message: msg })
+            });
+            const data = await resp.json();
+            typingEl.remove();
+
+            if (data.code === 200 && data.data) {
+                msgs.appendChild(createMsgEl(data.data.reply, 'assistant'));
+            } else {
+                msgs.appendChild(createMsgEl(data.message || 'AI 暂不可用，请先配置 API Key', 'assistant'));
+            }
+        } catch (e) {
+            typingEl.remove();
+            msgs.appendChild(createMsgEl('抱歉，连接失败：' + e.message, 'assistant'));
+        }
+
+        msgs.scrollTop = msgs.scrollHeight;
+        isSending = false;
+    };
+
+    function createMsgEl(text, role) {
+        const el = document.createElement('div');
+        el.className = 'ai-msg ' + role;
+        el.innerHTML = text.replace(/\n/g, '<br>');
+        return el;
+    }
+
+    function createTypingEl() {
+        const el = document.createElement('div');
+        el.className = 'ai-msg assistant';
+        el.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+        return el;
+    }
+})();
+</script>
+
 </body>
 </html>

@@ -65,6 +65,17 @@ class ReviewModel:
         return db.execute_update(query, (review_id,))
 
     @staticmethod
+    def get_score_distribution(laptop_id):
+        query = """
+            SELECT overall_score, COUNT(*) as count
+            FROM reviews
+            WHERE laptop_id = %s
+            GROUP BY overall_score
+            ORDER BY overall_score
+        """
+        return db.execute_query(query, (laptop_id,))
+
+    @staticmethod
     def vote_review(review_id, vote_type):
         if vote_type not in ['helpful', 'unhelpful']:
             return 0
