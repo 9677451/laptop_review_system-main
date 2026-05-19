@@ -116,21 +116,21 @@ def _create_tables():
 
 def _seed_brands():
     brands = [
-        ('联想', 'https://www.lenovo.com.cn', '中国北京', '全球领先的PC制造商，ThinkPad系列商务本深受好评'),
-        ('戴尔', 'https://www.dell.com.cn', '美国德克萨斯', '以XPS和Alienware闻名，品质可靠'),
-        ('华为', 'https://consumer.huawei.com/cn', '中国深圳', 'MateBook系列做工精致，多屏协同体验出色'),
-        ('苹果', 'https://www.apple.com.cn', '美国加利福尼亚', 'MacBook系列设计一流，M系列芯片性能卓越'),
-        ('华硕', 'https://www.asus.com.cn', '中国台湾', 'ROG游戏本霸主，轻薄本也颇有竞争力'),
-        ('惠普', 'https://www.hp.com/cn', '美国加利福尼亚', '战66和Spectre系列口碑优秀'),
-        ('小米', 'https://www.mi.com', '中国北京', 'RedmiBook性价比突出，生态互联便捷'),
-        ('宏碁', 'https://www.acer.com.cn', '中国台湾', '掠夺者游戏本系列性能强劲，非凡系列轻薄便携'),
-        ('微软', 'https://www.microsoft.com', '美国华盛顿', 'Surface系列二合一设计开创先河'),
-        ('神舟', 'https://www.hasee.com', '中国深圳', '战神系列游戏本配置高价格低，性价比之王'),
+        ('联想', 'https://www.lenovo.com.cn', '中国北京', '全球领先的PC制造商，ThinkPad系列商务本深受好评', '1984'),
+        ('戴尔', 'https://www.dell.com.cn', '美国德克萨斯', '以XPS和Alienware闻名，品质可靠', '1984'),
+        ('华为', 'https://consumer.huawei.com/cn', '中国深圳', 'MateBook系列做工精致，多屏协同体验出色', '1987'),
+        ('苹果', 'https://www.apple.com.cn', '美国加利福尼亚', 'MacBook系列设计一流，M系列芯片性能卓越', '1976'),
+        ('华硕', 'https://www.asus.com.cn', '中国台湾', 'ROG游戏本霸主，轻薄本也颇有竞争力', '1989'),
+        ('惠普', 'https://www.hp.com/cn', '美国加利福尼亚', '战66和Spectre系列口碑优秀', '1939'),
+        ('小米', 'https://www.mi.com', '中国北京', 'RedmiBook性价比突出，生态互联便捷', '2010'),
+        ('宏碁', 'https://www.acer.com.cn', '中国台湾', '掠夺者游戏本系列性能强劲，非凡系列轻薄便携', '1976'),
+        ('微软', 'https://www.microsoft.com', '美国华盛顿', 'Surface系列二合一设计开创先河', '1975'),
+        ('神舟', 'https://www.hasee.com', '中国深圳', '战神系列游戏本配置高价格低，性价比之王', '2001'),
     ]
     for b in brands:
         BrandModel.create_brand(
             brand_name=b[0], official_website=b[1],
-            headquarters=b[2], description=b[3]
+            headquarters=b[2], description=b[3], founded_date=b[4]
         )
     print(f'  [brands] 已创建 {len(brands)} 个品牌')
 
