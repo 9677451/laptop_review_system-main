@@ -1,102 +1,62 @@
-import mysql.connector
-from mysql.connector import Error, pooling
+import sqlite3
+import os
 from config import Config
-import time
+
 
 class Database:
     _instance = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance.pool = None
-            cls._instance._init_pool()
+            cls._instance._init()
         return cls._instance
-    
-    def _init_pool(self):
-        try:
-            if self.pool:
-                return
-            
-            self.pool = mysql.connector.pooling.MySQLConnectionPool(
-                pool_name="laptop_pool",
-                pool_size=3,  # 1GB 内存限制连接数
-                pool_reset_session=True,
-                host=Config.DB_HOST,
-                port=Config.DB_PORT,
-                user=Config.DB_USER,
-                password=Config.DB_PASSWORD,
-                database=Config.DB_NAME,
-                charset='utf8mb4',
-                connection_timeout=30
-            )
-        except Error as e:
-            print(f"数据库连接池初始化失败: {e}")
-            self.pool = None
 
-    def get_connection(self):
-        if not self.pool:
-            self._init_pool()
-        
-        if not self.pool:
-            raise Exception("数据库连接池不可用")
-        
-        try:
-            conn = self.pool.get_connection()
-            if conn.is_connected():
-                conn.ping(reconnect=True, attempts=3, delay=1)
-                return conn
-            else:
-                conn.close()
-        except Error as e:
-            print(f"获取数据库连接失败: {e}")
-            self.pool = None
-            self._init_pool()
-        
-        raise Exception("无法建立数据库连接")
+    def _init(self):
+        db_path = Config.DB_PATH
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self.conn.row_factory = sqlite3.Row
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA foreign_keys=ON")
 
     def execute_query(self, query, params=None):
-        conn = self.get_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = self.conn.cursor()
         try:
             cursor.execute(query, params or ())
-            result = cursor.fetchall()
-            return result
-        except Error as e:
-            print(f"执行查询失败: {e}")
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        except Exception as e:
+            print(f"查询失败: {e}")
             raise e
         finally:
             cursor.close()
-            conn.close()
 
     def execute_update(self, query, params=None):
-        conn = self.get_connection()
-        cursor = conn.cursor()
+        cursor = self.conn.cursor()
         try:
             cursor.execute(query, params or ())
-            conn.commit()
+            self.conn.commit()
             return cursor.rowcount
-        except Error as e:
-            conn.rollback()
-            print(f"执行更新失败: {e}")
+        except Exception as e:
+            self.conn.rollback()
+            print(f"更新失败: {e}")
             raise e
         finally:
             cursor.close()
-            conn.close()
 
     def execute_insert(self, query, params=None):
-        conn = self.get_connection()
-        cursor = conn.cursor()
+        cursor = self.conn.cursor()
         try:
             cursor.execute(query, params or ())
-            conn.commit()
+            self.conn.commit()
             return cursor.lastrowid
-        except Error as e:
-            conn.rollback()
-            print(f"执行插入失败: {e}")
+        except Exception as e:
+            self.conn.rollback()
+            print(f"插入失败: {e}")
             raise e
         finally:
             cursor.close()
-            conn.close()
+
 
 db = Database()

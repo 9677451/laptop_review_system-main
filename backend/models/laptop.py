@@ -5,7 +5,7 @@ class LaptopModel:
     def create_laptop(model, brand_id, specifications, price, release_date, cpu_type=None, ram_size=None, gpu_type=None, screen_size=None, image_url=None):
         query = """
             INSERT INTO laptops (model, brand_id, specifications, price, release_date, cpu_type, ram_size, gpu_type, screen_size, image_url)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         return db.execute_insert(query, (model, brand_id, specifications, price, release_date, cpu_type, ram_size, gpu_type, screen_size, image_url))
     
@@ -28,26 +28,26 @@ class LaptopModel:
         params = []
 
         if brand_id:
-            base_from += " AND l.brand_id = %s"
+            base_from += " AND l.brand_id = ?"
             params.append(brand_id)
         if keyword:
-            base_from += " AND (l.model LIKE %s OR l.specifications LIKE %s)"
+            base_from += " AND (l.model LIKE ? OR l.specifications LIKE ?)"
             params.append(f"%{keyword}%")
             params.append(f"%{keyword}%")
         if min_price:
-            base_from += " AND l.price >= %s"
+            base_from += " AND l.price >= ?"
             params.append(min_price)
         if max_price:
-            base_from += " AND l.price <= %s"
+            base_from += " AND l.price <= ?"
             params.append(max_price)
         if cpu_type:
-            base_from += " AND l.cpu_type LIKE %s"
+            base_from += " AND l.cpu_type LIKE ?"
             params.append(f"%{cpu_type}%")
         if ram_size:
-            base_from += " AND l.ram_size LIKE %s"
+            base_from += " AND l.ram_size LIKE ?"
             params.append(f"%{ram_size}%")
         if gpu_type:
-            base_from += " AND l.gpu_type LIKE %s"
+            base_from += " AND l.gpu_type LIKE ?"
             params.append(f"%{gpu_type}%")
 
         # Count query
@@ -66,7 +66,7 @@ class LaptopModel:
         else:
             data_query += " ORDER BY l.laptop_id DESC"
 
-        data_query += " LIMIT %s OFFSET %s"
+        data_query += " LIMIT ? OFFSET ?"
         data_params = list(params) + [page_size, offset]
 
         data = db.execute_query(data_query, tuple(data_params))
@@ -78,7 +78,7 @@ class LaptopModel:
             SELECT l.*, b.brand_name 
             FROM laptops l 
             JOIN brands b ON l.brand_id = b.brand_id 
-            WHERE l.laptop_id = %s
+            WHERE l.laptop_id = ?
         """
         result = db.execute_query(query, (laptop_id,))
         return result[0] if result else None
@@ -89,7 +89,7 @@ class LaptopModel:
         values = []
         for key, value in data.items():
             if value is not None:
-                fields.append(f"{key} = %s")
+                fields.append(f"{key} = ?")
                 values.append(value)
         if not fields:
             return 0
@@ -97,22 +97,22 @@ class LaptopModel:
         # 记录价格变动
         if 'price' in data:
             db.execute_update(
-                "INSERT INTO price_history (laptop_id, price, change_date) VALUES (%s, %s, NOW())",
+                "INSERT INTO price_history (laptop_id, price, change_date) VALUES (?, ?, NOW())",
                 (laptop_id, data['price'])
             )
             
         values.append(laptop_id)
-        query = f"UPDATE laptops SET {', '.join(fields)} WHERE laptop_id = %s"
+        query = f"UPDATE laptops SET {', '.join(fields)} WHERE laptop_id = ?"
         return db.execute_update(query, tuple(values))
 
     @staticmethod
     def get_price_history(laptop_id):
-        query = "SELECT price, DATE_FORMAT(change_date, '%Y-%m-%d') as date FROM price_history WHERE laptop_id = %s ORDER BY change_date ASC"
+        query = "SELECT price, strftime('%Y-%m-%d', change_date) as date FROM price_history WHERE laptop_id = ? ORDER BY change_date ASC"
         return db.execute_query(query, (laptop_id,))
     
     @staticmethod
     def delete_laptop(laptop_id):
-        query = "DELETE FROM laptops WHERE laptop_id = %s"
+        query = "DELETE FROM laptops WHERE laptop_id = ?"
         return db.execute_update(query, (laptop_id,))
 
     @staticmethod
@@ -127,8 +127,8 @@ class LaptopModel:
                 FROM reviews
                 GROUP BY laptop_id
             ) r_stats ON l.laptop_id = r_stats.laptop_id
-            WHERE l.brand_id = %s AND l.laptop_id != %s
+            WHERE l.brand_id = ? AND l.laptop_id != ?
             ORDER BY r_stats.avg_score DESC, l.laptop_id DESC
-            LIMIT %s
+            LIMIT ?
         """
         return db.execute_query(query, (brand_id, laptop_id, limit))

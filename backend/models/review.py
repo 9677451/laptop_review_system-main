@@ -6,7 +6,7 @@ class ReviewModel:
         query = """
             INSERT INTO reviews (user_id, laptop_id, overall_score, performance_score, 
                                 battery_score, experience_score, content, usage_duration, review_time)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
         """
         return db.execute_insert(query, (user_id, laptop_id, overall_score, performance_score, 
                                           battery_score, experience_score, content, usage_duration))
@@ -18,9 +18,9 @@ class ReviewModel:
             SELECT r.*, u.username, u.occupation, u.level, u.points
             FROM reviews r
             JOIN users u ON r.user_id = u.user_id
-            WHERE r.laptop_id = %s
+            WHERE r.laptop_id = ?
             ORDER BY r.review_time DESC
-            LIMIT %s OFFSET %s
+            LIMIT ? OFFSET ?
         """
         return db.execute_query(query, (laptop_id, page_size, offset))
     
@@ -34,14 +34,14 @@ class ReviewModel:
                 AVG(battery_score) as avg_battery,
                 AVG(experience_score) as avg_experience
             FROM reviews
-            WHERE laptop_id = %s
+            WHERE laptop_id = ?
         """
         result = db.execute_query(query, (laptop_id,))
         return result[0] if result else None
     
     @staticmethod
     def get_user_review(user_id, laptop_id):
-        query = "SELECT * FROM reviews WHERE user_id = %s AND laptop_id = %s"
+        query = "SELECT * FROM reviews WHERE user_id = ? AND laptop_id = ?"
         result = db.execute_query(query, (user_id, laptop_id))
         return result[0] if result else None
     
@@ -51,17 +51,17 @@ class ReviewModel:
         values = []
         for key, value in data.items():
             if value is not None:
-                fields.append(f"{key} = %s")
+                fields.append(f"{key} = ?")
                 values.append(value)
         if not fields:
             return 0
         values.append(review_id)
-        query = f"UPDATE reviews SET {', '.join(fields)} WHERE review_id = %s"
+        query = f"UPDATE reviews SET {', '.join(fields)} WHERE review_id = ?"
         return db.execute_update(query, tuple(values))
     
     @staticmethod
     def delete_review(review_id):
-        query = "DELETE FROM reviews WHERE review_id = %s"
+        query = "DELETE FROM reviews WHERE review_id = ?"
         return db.execute_update(query, (review_id,))
 
     @staticmethod
@@ -69,7 +69,7 @@ class ReviewModel:
         query = """
             SELECT overall_score, COUNT(*) as count
             FROM reviews
-            WHERE laptop_id = %s
+            WHERE laptop_id = ?
             GROUP BY overall_score
             ORDER BY overall_score
         """
@@ -80,5 +80,5 @@ class ReviewModel:
         if vote_type not in ['helpful', 'unhelpful']:
             return 0
         column = "helpful_count" if vote_type == 'helpful' else "unhelpful_count"
-        query = f"UPDATE reviews SET {column} = {column} + 1 WHERE review_id = %s"
+        query = f"UPDATE reviews SET {column} = {column} + 1 WHERE review_id = ?"
         return db.execute_update(query, (review_id,))

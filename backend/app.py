@@ -1,6 +1,5 @@
 import os
 import gc
-import subprocess
 import datetime
 import json
 from flask import Flask, request, jsonify, send_from_directory
@@ -15,11 +14,14 @@ from models.review import ReviewModel
 from models.question import QuestionModel
 from ai_service import AIService
 from rate_limiter import limiter, ENDPOINT_LIMITS, get_client_ip
+from init_db import init_db
 
 app = Flask(__name__, static_folder='../frontend')
 app.config['JSON_AS_ASCII'] = False  # 中文 JSON 不转义，减少 CPU
 app.config['JSON_SORT_KEYS'] = False  # 不排序 JSON key，减少开销
 CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+init_db()  # 自动建表 + 灌入种子数据
 
 @app.route('/')
 def serve_index():
@@ -182,7 +184,7 @@ def get_brand_detail(brand_id):
     stats_query = """
         SELECT AVG(overall_score) as avg_score, COUNT(*) as review_count
         FROM reviews r JOIN laptops l ON r.laptop_id = l.laptop_id
-        WHERE l.brand_id = %s
+        WHERE l.brand_id = ?
     """
     stats = db.execute_query(stats_query, (brand_id,))
     return jsonify({
@@ -197,9 +199,15 @@ def get_brand_detail(brand_id):
 @app.route('/api/brands/rankings', methods=['GET'])
 def get_brand_rankings():
     query = """
-        SELECT b.brand_name, AVG(l.avg_score) as avg_score, COUNT(l.laptop_id) as laptop_count
+        SELECT b.brand_name,
+               AVG(r_stats.avg_score) as avg_score,
+               COUNT(l.laptop_id) as laptop_count
         FROM brands b
         LEFT JOIN laptops l ON b.brand_id = l.brand_id
+        LEFT JOIN (
+            SELECT laptop_id, AVG(overall_score) as avg_score
+            FROM reviews GROUP BY laptop_id
+        ) r_stats ON l.laptop_id = r_stats.laptop_id
         GROUP BY b.brand_id
         HAVING laptop_count > 0
         ORDER BY avg_score DESC
@@ -324,7 +332,7 @@ def get_all_reviews():
         JOIN users u ON r.user_id = u.user_id
         JOIN laptops l ON r.laptop_id = l.laptop_id
         ORDER BY r.review_time DESC
-        LIMIT %s OFFSET %s
+        LIMIT ? OFFSET ?
     """
     reviews = db.execute_query(query, (page_size, offset))
     return jsonify({'code': 200, 'data': reviews})
@@ -344,7 +352,7 @@ def delete_review(review_id):
     # 需要是管理员或评价作者
     if role != 'admin':
         result = db.execute_query(
-            "SELECT user_id FROM reviews WHERE review_id = %s", (review_id,)
+            "SELECT user_id FROM reviews WHERE review_id = ?", (review_id,)
         )
         if not result:
             return jsonify({'code': 404, 'message': '评价不存在'}), 404
@@ -414,7 +422,7 @@ def delete_question(question_id):
         questions = QuestionModel.get_questions_by_laptop(None)
         # 从数据库直接查
         result = db.execute_query(
-            "SELECT user_id FROM questions WHERE question_id = %s", (question_id,)
+            "SELECT user_id FROM questions WHERE question_id = ?", (question_id,)
         )
         if not result:
             return jsonify({'code': 404, 'message': '问答不存在'}), 404
@@ -485,7 +493,7 @@ def get_admin_stats():
     review_trend = db.execute_query("""
         SELECT DATE(review_time) as date, COUNT(*) as count
         FROM reviews
-        WHERE review_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+        WHERE review_time >= date('now', '-7 days', 'localtime')
         GROUP BY DATE(review_time)
         ORDER BY date ASC
     """)
@@ -510,17 +518,14 @@ def get_admin_stats():
 @token_required
 @admin_required
 def backup_system():
+    import shutil
     backup_dir = os.path.join(os.path.dirname(__file__), 'backups')
-    if not os.path.exists(backup_dir):
-        os.makedirs(backup_dir)
+    os.makedirs(backup_dir, exist_ok=True)
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f"backup_{timestamp}.sql"
+    filename = f"backup_{timestamp}.db"
     filepath = os.path.join(backup_dir, filename)
     try:
-        command = f'mysqldump -h {Config.DB_HOST} -u {Config.DB_USER} -p{Config.DB_PASSWORD} {Config.DB_NAME} --result-file="{filepath}"'
-        result = subprocess.run(command, shell=True, capture_output=True, text=True)
-        if result.returncode != 0:
-            return jsonify({'code': 500, 'message': f'备份失败: {result.stderr}'}), 500
+        shutil.copy2(Config.DB_PATH, filepath)
         return jsonify({'code': 200, 'message': '系统备份成功', 'filename': filename})
     except Exception as e:
         return jsonify({'code': 500, 'message': f'备份错误: {str(e)}'}), 500
@@ -529,6 +534,7 @@ def backup_system():
 @token_required
 @admin_required
 def restore_system():
+    import shutil
     data = request.get_json()
     filename = data.get('filename')
     if not filename:
@@ -538,10 +544,9 @@ def restore_system():
     if not os.path.exists(filepath):
         return jsonify({'code': 404, 'message': '备份文件不存在'}), 404
     try:
-        command = f'mysql -h {Config.DB_HOST} -u {Config.DB_USER} -p{Config.DB_PASSWORD} {Config.DB_NAME} < "{filepath}"'
-        result = subprocess.run(command, shell=True, capture_output=True, text=True)
-        if result.returncode != 0:
-            return jsonify({'code': 500, 'message': f'恢复失败: {result.stderr}'}), 500
+        db.conn.close()
+        shutil.copy2(filepath, Config.DB_PATH)
+        db._init()
         return jsonify({'code': 200, 'message': '系统恢复成功'})
     except Exception as e:
         return jsonify({'code': 500, 'message': f'恢复错误: {str(e)}'}), 500
@@ -555,7 +560,7 @@ def list_backups():
         return jsonify({'code': 200, 'data': []})
     backups = []
     for f in os.listdir(backup_dir):
-        if f.endswith('.sql'):
+        if f.endswith('.db'):
             path = os.path.join(backup_dir, f)
             backups.append({
                 'filename': f,
@@ -634,7 +639,7 @@ def ai_summary():
     # 1. 先查缓存（表不存在时自动创建）
     try:
         cache = db.execute_query(
-            "SELECT summary FROM ai_summaries WHERE laptop_id=%s AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)",
+            "SELECT summary FROM ai_summaries WHERE laptop_id=? AND created_at > datetime('now', '-7 days', 'localtime')",
             (laptop_id,)
         )
         if cache:
@@ -667,7 +672,7 @@ def ai_summary():
     # 4. 存入缓存
     try:
         db.execute_update(
-            "INSERT INTO ai_summaries (laptop_id, summary) VALUES (%s, %s) ON DUPLICATE KEY UPDATE summary=VALUES(summary), created_at=NOW()",
+            "INSERT INTO ai_summaries (laptop_id, summary) VALUES (?, ?) ON DUPLICATE KEY UPDATE summary=VALUES(summary), created_at=NOW()",
             (laptop_id, summary)
         )
     except Exception as e:
