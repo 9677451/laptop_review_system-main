@@ -14,6 +14,7 @@ from models.laptop import LaptopModel
 from models.review import ReviewModel
 from models.question import QuestionModel
 from ai_service import AIService
+from rate_limiter import limiter, ENDPOINT_LIMITS, get_client_ip
 
 app = Flask(__name__, static_folder='../frontend')
 app.config['JSON_AS_ASCII'] = False  # 中文 JSON 不转义，减少 CPU
@@ -586,6 +587,11 @@ def add_gc_header(response):
 @app.route('/api/ai/chat', methods=['POST'])
 def ai_chat():
     """AI 对话推荐"""
+    ip = get_client_ip(request)
+    max_req, window = ENDPOINT_LIMITS['ai_chat']
+    if not limiter.is_allowed(ip, max_req, window):
+        return jsonify({'code': 429, 'message': f'请求过于频繁，请{window}秒后再试'}), 429
+
     data = request.get_json()
     user_message = data.get('message', '')
     if not user_message:
@@ -611,6 +617,11 @@ def ai_chat():
 @app.route('/api/ai/summary', methods=['POST'])
 def ai_summary():
     """AI 评价摘要（带缓存，避免重复烧 token）"""
+    ip = get_client_ip(request)
+    max_req, window = ENDPOINT_LIMITS['ai_summary']
+    if not limiter.is_allowed(ip, max_req, window):
+        return jsonify({'code': 429, 'message': f'请求过于频繁，请{window}秒后再试'}), 429
+
     data = request.get_json()
     laptop_id = data.get('laptop_id')
     if not laptop_id:
@@ -668,6 +679,11 @@ def ai_summary():
 @app.route('/api/ai/recommend', methods=['POST'])
 def ai_recommend():
     """AI 智能推荐"""
+    ip = get_client_ip(request)
+    max_req, window = ENDPOINT_LIMITS['ai_recommend']
+    if not limiter.is_allowed(ip, max_req, window):
+        return jsonify({'code': 429, 'message': f'请求过于频繁，请{window}秒后再试'}), 429
+
     data = request.get_json()
     preferences = {
         'budget': data.get('budget', 5000),
